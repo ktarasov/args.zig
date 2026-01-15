@@ -245,6 +245,7 @@ try parser.addOption("mode", .{
     .validator = validateMode,
     .metavar = "<W>x<H>[@<R>Hz]",
 });
+```
 
 ### Aliases
 
@@ -277,7 +278,6 @@ try parser.addArg(.{
     .action = .callback,
     .callback = onOutput,
 });
-```
 ```
 
 ### Declarative Structs
