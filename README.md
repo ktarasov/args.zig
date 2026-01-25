@@ -29,6 +29,10 @@
 
 A production-grade, high-performance command-line argument parsing library for Zig, inspired by Python's argparse with a clean, intuitive, and developer-friendly API.
 
+> [!NOTE]
+> **args.zig is a relatively new project**, but it is designed and tested with production use in mind.
+> The API is intended to be stable, and the library focuses on performance, correctness, and real-world CLI needs.
+
 ⭐ **If you love `args.zig`, make sure to give it a star!**
 
 ## Features
