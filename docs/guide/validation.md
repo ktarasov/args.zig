@@ -38,6 +38,18 @@ Behavior depends on `Config`:
 - **Strict Mode**: behaves like `choices` (errors on mismatch).
 - **Permissive Mode** (default): prints a warning if value is not in `expect` list, but accepts it.
 
+## Positional Validation
+
+Validation options are available for positional arguments too.
+
+```zig
+try parser.addPositional("mode", .{
+    .choices = &[_][]const u8{ "dev", "prod" },
+});
+```
+
+`addPositional` also supports `.expect`, `.validator`, and `.hidden`.
+
 
 ## Custom Validators
 
@@ -65,3 +77,48 @@ pub fn main() !void {
 ```
 
 If validation fails, the error message returned in `.err` will be displayed to the user.
+
+## Built-in File And Filename Validators
+
+args.zig includes reusable built-ins for common file workflows:
+
+- `Validators.pathExists`
+- `Validators.fileExists`
+- `Validators.directoryExists`
+- `Validators.extension(...)`
+- `Validators.existingFileWithExtension(...)`
+- `Validators.fileNameSafe`
+- `Validators.fileNameWithExtensions(...)`
+- `Validators.fileNameLength(min, max)`
+
+## Validator Composition
+
+You can combine validators without duplicating logic:
+
+```zig
+const output_name_validator = args.Validators.all(&[_]args.ValidatorFn{
+    args.Validators.fileExt(&[_][]const u8{"json"}, false),
+    args.Validators.fileNameLength(3, 64),
+});
+
+try parser.addOption("output-name", .{
+    .validator = output_name_validator,
+});
+```
+
+Use `args.Validators.any(...)` for OR-style matching.
+
+## Simplified Direct API
+
+For common filename rules, use one direct call:
+
+```zig
+const output_name_validator = args.Validators.filePolicy(&[_][]const u8{"json"}, false, 3, 64);
+```
+
+Alias shortcuts are also available:
+
+- `args.Validators.all(...)` / `args.Validators.any(...)`
+- `args.Validators.fileName`
+- `args.Validators.fileExt(...)`
+- `args.Validators.filePolicy(...)`
