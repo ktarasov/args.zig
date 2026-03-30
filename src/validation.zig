@@ -331,6 +331,47 @@ pub fn validatePort(value: []const u8) bool {
     return parsed >= 1;
 }
 
+fn validateIpv6Literal(value: []const u8) bool {
+    if (value.len < 2) return false;
+
+    var has_colon = false;
+    for (value) |c| {
+        if (std.ascii.isHex(c)) continue;
+        if (c == ':') {
+            has_colon = true;
+            continue;
+        }
+        if (c == '.') continue;
+        return false;
+    }
+    return has_colon;
+}
+
+/// Validates host:port endpoint values.
+/// Supports: hostname:port, ipv4:port, and [ipv6]:port.
+pub fn validateEndpoint(value: []const u8) bool {
+    if (value.len < 3) return false;
+
+    if (value[0] == '[') {
+        const end_idx = std.mem.indexOfScalar(u8, value, ']') orelse return false;
+        if (end_idx + 2 > value.len) return false;
+        if (value[end_idx + 1] != ':') return false;
+
+        const host = value[1..end_idx];
+        const port = value[end_idx + 2 ..];
+        return validateIpv6Literal(host) and validatePort(port);
+    }
+
+    const colon_idx = std.mem.lastIndexOfScalar(u8, value, ':') orelse return false;
+    const host = value[0..colon_idx];
+    const port = value[colon_idx + 1 ..];
+
+    if (host.len == 0) return false;
+    if (!validatePort(port)) return false;
+
+    return validateHostName(host) or validateIPv4Address(host);
+}
+
 fn ensureAllowedExtension(value: []const u8, allowed_extensions: []const []const u8, case_sensitive: bool) ValidationResult {
     if (hasAnyExtension(value, allowed_extensions, case_sensitive)) return .{ .ok = {} };
     return .{ .err = "file extension is not allowed" };
@@ -438,6 +479,10 @@ pub const Validators = struct {
 
     pub fn port(value: []const u8) ValidationResult {
         return if (validatePort(value)) .{ .ok = {} } else .{ .err = "invalid port (expected 1..65535)" };
+    }
+
+    pub fn endpoint(value: []const u8) ValidationResult {
+        return if (validateEndpoint(value)) .{ .ok = {} } else .{ .err = "invalid endpoint (expected host:port)" };
     }
 
     pub fn intRange(comptime min: ?i64, comptime max: ?i64) ValidatorFn {
@@ -592,6 +637,7 @@ pub const Validators = struct {
     pub const email = emailAddress;
     pub const url = httpUrl;
     pub const ip = ipv4;
+    pub const hostPort = endpoint;
     pub const date = isoDate;
     pub const dateTime = isoDateTime;
     pub const ext = extension;
@@ -787,6 +833,16 @@ test "hostname and port validators" {
     try std.testing.expect(validatePort("8080"));
     try std.testing.expect(!validatePort("0"));
     try std.testing.expect(!validatePort("70000"));
+}
+
+test "endpoint validator" {
+    try std.testing.expect(validateEndpoint("api.example.com:443"));
+    try std.testing.expect(validateEndpoint("127.0.0.1:8080"));
+    try std.testing.expect(validateEndpoint("[2001:db8::1]:443"));
+
+    try std.testing.expect(!validateEndpoint("api.example.com"));
+    try std.testing.expect(!validateEndpoint("api.example.com:0"));
+    try std.testing.expect(!validateEndpoint("[2001:db8::1]"));
 }
 
 test "Validators intRange and floatRange" {

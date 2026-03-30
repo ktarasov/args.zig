@@ -10,9 +10,14 @@ pub const CommandSpec = schema.CommandSpec;
 pub const ArgSpec = schema.ArgSpec;
 pub const SubcommandSpec = schema.SubcommandSpec;
 
-/// Generate help text for a command specification.
+/// Generate help text for a command specification using global config.
 pub fn generateHelp(allocator: std.mem.Allocator, spec: CommandSpec, use_colors: bool) ![]const u8 {
-    var result: std.ArrayListUnmanaged(u8) = .empty;
+    return generateHelpWithConfig(allocator, spec, use_colors, config.getConfig());
+}
+
+/// Generate help text for a command specification using an explicit config.
+pub fn generateHelpWithConfig(allocator: std.mem.Allocator, spec: CommandSpec, use_colors: bool, cfg: config.Config) ![]const u8 {
+    var result: std.ArrayList(u8) = .empty;
     errdefer result.deinit(allocator);
     const writer = result.writer(allocator);
 
@@ -88,8 +93,6 @@ pub fn generateHelp(allocator: std.mem.Allocator, spec: CommandSpec, use_colors:
             break;
         }
     }
-
-    const cfg = config.getConfig();
 
     // 1. Grouped Options
     for (spec.groups) |group| {
@@ -210,7 +213,7 @@ fn printOption(writer: anytype, arg: ArgSpec, cfg: config.Config, use_colors: bo
 
 /// Generate a short usage line.
 pub fn generateUsage(allocator: std.mem.Allocator, spec: CommandSpec) ![]const u8 {
-    var result: std.ArrayListUnmanaged(u8) = .empty;
+    var result: std.ArrayList(u8) = .empty;
     errdefer result.deinit(allocator);
     const writer = result.writer(allocator);
 

@@ -27,7 +27,7 @@ pub const Parser = struct {
     cfg: Config,
     short_map: std.AutoHashMap(u8, *const ArgSpec),
     long_map: std.StringHashMap(*const ArgSpec),
-    long_key_storage: std.ArrayListUnmanaged([]const u8),
+    long_key_storage: std.ArrayList([]const u8),
 
     /// Initializes a new parser instance with the given specification.
     pub fn init(allocator: std.mem.Allocator, spec: CommandSpec) !Parser {
@@ -260,7 +260,7 @@ pub const Parser = struct {
         std.debug.print("Error: Unknown option '{s}{s}'\n", .{ prefix, name });
 
         if (!is_short) {
-            var candidates: std.ArrayListUnmanaged([]const u8) = .empty;
+            var candidates: std.ArrayList([]const u8) = .empty;
             defer candidates.deinit(self.allocator);
             var it = self.long_map.keyIterator();
             while (it.next()) |k| candidates.append(self.allocator, k.*) catch break;
@@ -317,7 +317,7 @@ pub const Parser = struct {
 
         if (arg_spec == null) {
             if (!is_short and utils.eql(name, "help")) {
-                const help_text = try help.generateHelp(self.allocator, self.spec, self.cfg.use_colors);
+                const help_text = try help.generateHelpWithConfig(self.allocator, self.spec, self.cfg.use_colors, self.cfg);
                 std.debug.print("{s}", .{help_text});
                 self.allocator.free(help_text);
                 if (self.cfg.exit_on_error) std.process.exit(0);
@@ -329,7 +329,7 @@ pub const Parser = struct {
                 return;
             }
             if (is_short and name[0] == 'h') {
-                const help_text = try help.generateHelp(self.allocator, self.spec, self.cfg.use_colors);
+                const help_text = try help.generateHelpWithConfig(self.allocator, self.spec, self.cfg.use_colors, self.cfg);
                 std.debug.print("{s}", .{help_text});
                 self.allocator.free(help_text);
                 if (self.cfg.exit_on_error) std.process.exit(0);
@@ -439,7 +439,7 @@ pub const Parser = struct {
                 }
             },
             .help => {
-                const help_text = try help.generateHelp(self.allocator, self.spec, self.cfg.use_colors);
+                const help_text = try help.generateHelpWithConfig(self.allocator, self.spec, self.cfg.use_colors, self.cfg);
                 std.debug.print("{s}", .{help_text});
                 self.allocator.free(help_text);
                 if (self.cfg.exit_on_error) std.process.exit(0);
@@ -862,7 +862,7 @@ test "Parser owns parsed string memory" {
     defer parser.deinit();
 
     var arena = std.heap.ArenaAllocator.init(allocator);
-    var args_list: std.ArrayListUnmanaged([]const u8) = .empty;
+    var args_list: std.ArrayList([]const u8) = .empty;
 
     try args_list.append(arena.allocator(), try arena.allocator().dupe(u8, "-i"));
     try args_list.append(arena.allocator(), try arena.allocator().dupe(u8, "./canvas/0001.xml"));

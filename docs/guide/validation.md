@@ -100,6 +100,7 @@ args.zig also provides reusable validators for common app and API inputs:
 - `Validators.ipv4` / `Validators.ip`
 - `Validators.hostname`
 - `Validators.port`
+- `Validators.endpoint` / `Validators.hostPort`
 - `Validators.uuid`
 - `Validators.isoDate` / `Validators.date`
 - `Validators.isoDateTime` / `Validators.dateTime`
@@ -126,6 +127,7 @@ try parser.addUrlOption("endpoint", .{});
 try parser.addIpv4Option("host", .{});
 try parser.addHostNameOption("hostname", .{});
 try parser.addPortOption("port", .{});
+try parser.addEndpointOption("service", .{}); // host:port
 try parser.addUuidOption("request-id", .{});
 try parser.addIsoDateOption("run-date", .{});
 try parser.addIsoDateTimeOption("timestamp", .{});

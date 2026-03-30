@@ -27,6 +27,7 @@ pub fn main() !void {
     try parser.addYearOption("year", .{ .help = "Run year (YYYY)" });
     try parser.addTimeOption("time", .{ .help = "Run time (HH:MM[:SS])" });
     try parser.addPortOption("port", .{ .help = "Service port (1..65535)" });
+    try parser.addEndpointOption("service", .{ .help = "Service endpoint (host:port)" });
     try parser.addAbsolutePathOption("workspace", .{ .help = "Absolute workspace path" });
     try parser.addFileOption("input-file", .{ .help = "Input file path (absolute or relative)", .must_exist = false });
     try parser.addJsonOption("payload", .{ .help = "JSON payload" });
@@ -61,6 +62,8 @@ pub fn main() !void {
         "12:45:59",
         "--port",
         "8080",
+        "--service",
+        "api.example.com:443",
         "--workspace",
         workspace_abs,
         "--input-file",
@@ -84,6 +87,7 @@ pub fn main() !void {
     std.debug.print("year: {s}\n", .{parsed.getString("year") orelse "<missing>"});
     std.debug.print("time: {s}\n", .{parsed.getString("time") orelse "<missing>"});
     std.debug.print("port: {s}\n", .{parsed.getString("port") orelse "<missing>"});
+    std.debug.print("service: {s}\n", .{parsed.getString("service") orelse "<missing>"});
     std.debug.print("workspace: {s}\n", .{parsed.getString("workspace") orelse "<missing>"});
     std.debug.print("input-file: {s}\n", .{parsed.getString("input-file") orelse "<missing>"});
     std.debug.print("payload: {s}\n", .{parsed.getString("payload") orelse "<missing>"});

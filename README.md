@@ -56,7 +56,7 @@ A production-grade, high-performance command-line argument parsing library for Z
 - [**Include/Exclude Filters**](https://muhammad-fiaz.github.io/args.zig/guide/options-flags#includeexclude-filters) - Reusable `--include` and `--exclude` helpers for CMD workflows
 - [**Strict Filter Resolution**](https://muhammad-fiaz.github.io/args.zig/guide/options-flags#strict-includeexclude-resolution) - Canonicalize choices, dedupe values, and detect include/exclude conflicts
 - [**File & Extension Support**](https://muhammad-fiaz.github.io/args.zig/guide/options-flags#file-and-extension-support) - Reusable helpers for file paths, directories, and allowed extensions
-- [**Typed Input Validators**](https://muhammad-fiaz.github.io/args.zig/guide/validation#typed-input-validators) - Built-in validators for email, URL, IPv4, UUID, ISO dates, year/time, JSON payloads, and absolute paths
+- [**Typed Input Validators**](https://muhammad-fiaz.github.io/args.zig/guide/validation#typed-input-validators) - Built-in validators for email, URL, IPv4, hostname/port endpoints, UUID, ISO dates, year/time, JSON payloads, and absolute paths
 - [**CSV Select/All Resolution**](https://muhammad-fiaz.github.io/args.zig/guide/options-flags#csv-selectall-strict-resolution) - Resolve `--select users,groups` and `--all` into normalized target sets
 - [**Well Tested**](CONTRIBUTING.md#running-tests) - Extensive test coverage across all modules
 

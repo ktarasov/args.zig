@@ -37,7 +37,7 @@ pub fn generateCompletion(allocator: std.mem.Allocator, spec: CommandSpec, shell
 }
 
 fn generateBashCompletion(allocator: std.mem.Allocator, spec: CommandSpec) ![]const u8 {
-    var result: std.ArrayListUnmanaged(u8) = .empty;
+    var result: std.ArrayList(u8) = .empty;
     errdefer result.deinit(allocator);
     const writer = result.writer(allocator);
 
@@ -75,7 +75,7 @@ fn generateBashCompletion(allocator: std.mem.Allocator, spec: CommandSpec) ![]co
 }
 
 fn generateZshCompletion(allocator: std.mem.Allocator, spec: CommandSpec) ![]const u8 {
-    var result: std.ArrayListUnmanaged(u8) = .empty;
+    var result: std.ArrayList(u8) = .empty;
     errdefer result.deinit(allocator);
     const writer = result.writer(allocator);
 
@@ -98,7 +98,7 @@ fn generateZshCompletion(allocator: std.mem.Allocator, spec: CommandSpec) ![]con
 }
 
 fn generateFishCompletion(allocator: std.mem.Allocator, spec: CommandSpec) ![]const u8 {
-    var result: std.ArrayListUnmanaged(u8) = .empty;
+    var result: std.ArrayList(u8) = .empty;
     errdefer result.deinit(allocator);
     const writer = result.writer(allocator);
 
@@ -127,7 +127,7 @@ fn generateFishCompletion(allocator: std.mem.Allocator, spec: CommandSpec) ![]co
 }
 
 fn generatePowershellCompletion(allocator: std.mem.Allocator, spec: CommandSpec) ![]const u8 {
-    var result: std.ArrayListUnmanaged(u8) = .empty;
+    var result: std.ArrayList(u8) = .empty;
     errdefer result.deinit(allocator);
     const writer = result.writer(allocator);
 
@@ -152,7 +152,7 @@ fn generatePowershellCompletion(allocator: std.mem.Allocator, spec: CommandSpec)
 }
 
 fn generateNushellCompletion(allocator: std.mem.Allocator, spec: CommandSpec) ![]const u8 {
-    var result: std.ArrayListUnmanaged(u8) = .empty;
+    var result: std.ArrayList(u8) = .empty;
     errdefer result.deinit(allocator);
     const writer = result.writer(allocator);
 

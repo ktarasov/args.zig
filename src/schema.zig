@@ -149,7 +149,7 @@ pub const SubcommandSpec = struct {
 pub const ArgumentGroup = struct {
     name: []const u8,
     description: ?[]const u8 = null,
-    args: std.ArrayListUnmanaged(ArgSpec) = .empty,
+    args: std.ArrayList(ArgSpec) = .empty,
     exclusive: bool = false,
     required: bool = false,
 
@@ -197,9 +197,9 @@ pub const SchemaBuilder = struct {
     name: []const u8,
     version: ?[]const u8 = null,
     description: ?[]const u8 = null,
-    args: std.ArrayListUnmanaged(ArgSpec),
-    groups: std.ArrayListUnmanaged(ArgumentGroup),
-    subcommands: std.ArrayListUnmanaged(SubcommandSpec),
+    args: std.ArrayList(ArgSpec),
+    groups: std.ArrayList(ArgumentGroup),
+    subcommands: std.ArrayList(SubcommandSpec),
     epilog: ?[]const u8 = null,
     add_help: bool = true,
     add_version: bool = true,

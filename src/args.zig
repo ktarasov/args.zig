@@ -78,9 +78,9 @@ pub const ArgumentParser = struct {
     version: ?[]const u8 = null,
     description: ?[]const u8 = null,
     epilog: ?[]const u8 = null,
-    args: std.ArrayListUnmanaged(ArgSpec),
-    groups: std.ArrayListUnmanaged(ArgumentGroup),
-    subcommands: std.ArrayListUnmanaged(SubcommandSpec),
+    args: std.ArrayList(ArgSpec),
+    groups: std.ArrayList(ArgumentGroup),
+    subcommands: std.ArrayList(SubcommandSpec),
     current_group: ?*ArgumentGroup = null,
     add_help: bool = true,
     add_version: bool = true,
@@ -412,13 +412,14 @@ pub const ArgumentParser = struct {
             aliases: []const []const u8 = &.{},
             deprecated: ?[]const u8 = null,
             must_exist: bool = false,
-            case_sensitive_extensions: bool = false,
+            case_sensitive_extensions: ?bool = null,
             expect: []const []const u8 = &.{},
         },
     ) !void {
+        const case_sensitive_extensions = options.case_sensitive_extensions orelse self.cfg.case_sensitive;
         const validator_fn = pickExtensionValidator(
             allowed_extensions,
-            options.case_sensitive_extensions,
+            case_sensitive_extensions,
             options.must_exist,
             false,
         );
@@ -493,13 +494,14 @@ pub const ArgumentParser = struct {
             hidden: bool = false,
             aliases: []const []const u8 = &.{},
             deprecated: ?[]const u8 = null,
-            case_sensitive_extensions: bool = false,
+            case_sensitive_extensions: ?bool = null,
             expect: []const []const u8 = &.{},
         },
     ) !void {
+        const case_sensitive_extensions = options.case_sensitive_extensions orelse self.cfg.case_sensitive;
         const validator_fn = pickExtensionValidator(
             allowed_extensions,
-            options.case_sensitive_extensions,
+            case_sensitive_extensions,
             false,
             true,
         );
@@ -845,6 +847,37 @@ pub const ArgumentParser = struct {
         expect: []const []const u8 = &.{},
     }) !void {
         const validator_fn = options.validator orelse validation.Validators.port;
+        try self.addValidatedStringOption(name, validator_fn, .{
+            .short = options.short,
+            .help = options.help,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .expect = options.expect,
+        });
+    }
+
+    /// Adds a host:port endpoint option (for example `api.example.com:443`).
+    pub fn addEndpointOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = "HOST:PORT",
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        validator: ?validation.ValidatorFn = null,
+        expect: []const []const u8 = &.{},
+    }) !void {
+        const validator_fn = options.validator orelse validation.Validators.endpoint;
         try self.addValidatedStringOption(name, validator_fn, .{
             .short = options.short,
             .help = options.help,
@@ -1236,7 +1269,7 @@ pub const ArgumentParser = struct {
         var args_iter = try std.process.argsWithAllocator(self.allocator);
         defer args_iter.deinit();
 
-        var args_list: std.ArrayListUnmanaged([]const u8) = .empty;
+        var args_list: std.ArrayList([]const u8) = .empty;
         defer args_list.deinit(self.allocator);
 
         _ = args_iter.next(); // Skip program name
@@ -1251,7 +1284,7 @@ pub const ArgumentParser = struct {
     /// Generates the help text for the configured arguments.
     pub fn getHelp(self: *ArgumentParser) ![]const u8 {
         const spec = self.buildSpec();
-        return help.generateHelp(self.allocator, spec, self.cfg.use_colors);
+        return help.generateHelpWithConfig(self.allocator, spec, self.cfg.use_colors, self.cfg);
     }
 
     /// Prints the help text to stdout.
@@ -1608,7 +1641,7 @@ pub const PromptSelectOrAllOptions = struct {
     choices: []const []const u8,
     default_choice: ?[]const u8 = null,
     allow_all: bool = true,
-    case_sensitive: bool = false,
+    case_sensitive: ?bool = null,
     allow_prefix_match: bool = true,
     suggest_closest: bool = true,
     max_suggestion_distance: usize = 3,
@@ -1636,8 +1669,15 @@ fn equalsWithCase(a: []const u8, b: []const u8, case_sensitive: bool) bool {
 }
 
 fn pickChoiceByName(input: []const u8, choices: []const []const u8, case_sensitive: bool) ?[]const u8 {
+    if (case_sensitive) {
+        for (choices) |choice| {
+            if (std.mem.eql(u8, choice, input)) return choice;
+        }
+        return null;
+    }
+
     for (choices) |choice| {
-        if (equalsWithCase(choice, input, case_sensitive)) return choice;
+        if (std.ascii.eqlIgnoreCase(choice, input)) return choice;
     }
     return null;
 }
@@ -1650,8 +1690,18 @@ fn startsWithCase(text: []const u8, prefix: []const u8, case_sensitive: bool) bo
 
 fn pickChoiceByUniquePrefix(input: []const u8, choices: []const []const u8, case_sensitive: bool) ?[]const u8 {
     var found: ?[]const u8 = null;
+    if (case_sensitive) {
+        for (choices) |choice| {
+            if (std.mem.startsWith(u8, choice, input)) {
+                if (found != null) return null;
+                found = choice;
+            }
+        }
+        return found;
+    }
+
     for (choices) |choice| {
-        if (startsWithCase(choice, input, case_sensitive)) {
+        if (startsWithCase(choice, input, false)) {
             if (found != null) return null;
             found = choice;
         }
@@ -1659,10 +1709,14 @@ fn pickChoiceByUniquePrefix(input: []const u8, choices: []const []const u8, case
     return found;
 }
 
+fn effectivePromptCaseSensitive(options: PromptSelectOrAllOptions) bool {
+    return options.case_sensitive orelse config.getConfig().case_sensitive;
+}
+
 /// Parses comma-separated values into trimmed non-empty items.
 /// The returned slice and each item are owned by the caller allocator.
 pub fn parseCsvList(allocator: std.mem.Allocator, raw: []const u8) ![][]const u8 {
-    var items = std.ArrayListUnmanaged([]const u8).empty;
+    var items = std.ArrayList([]const u8).empty;
     errdefer {
         for (items.items) |item| allocator.free(item);
         items.deinit(allocator);
@@ -1748,7 +1802,7 @@ fn indexOfFilterValue(items: [][]const u8, value: []const u8, case_sensitive: bo
 
 fn appendFilterValue(
     allocator: std.mem.Allocator,
-    items: *std.ArrayListUnmanaged([]const u8),
+    items: *std.ArrayList([]const u8),
     value: []const u8,
     case_sensitive: bool,
     dedupe: bool,
@@ -1819,7 +1873,7 @@ pub fn resolveSelectOrAllStrict(
         };
     }
 
-    var selected_out = std.ArrayListUnmanaged([]const u8).empty;
+    var selected_out = std.ArrayList([]const u8).empty;
     errdefer {
         for (selected_out.items) |item| allocator.free(item);
         selected_out.deinit(allocator);
@@ -1858,13 +1912,13 @@ pub fn resolveIncludeExcludeStrict(
     parsed: *const ParseResult,
     options: IncludeExcludeStrictOptions,
 ) !IncludeExcludeStrictResolved {
-    var include_out = std.ArrayListUnmanaged([]const u8).empty;
+    var include_out = std.ArrayList([]const u8).empty;
     errdefer {
         for (include_out.items) |item| allocator.free(item);
         include_out.deinit(allocator);
     }
 
-    var exclude_out = std.ArrayListUnmanaged([]const u8).empty;
+    var exclude_out = std.ArrayList([]const u8).empty;
     errdefer {
         for (exclude_out.items) |item| allocator.free(item);
         exclude_out.deinit(allocator);
@@ -1937,6 +1991,7 @@ pub fn resolveSelectOrAllWithPromptIO(
     writer: anytype,
 ) !PromptSelectOrAllDecision {
     if (options.choices.len == 0 and !options.allow_all) return error.InvalidConfig;
+    const case_sensitive = effectivePromptCaseSensitive(options);
 
     if (parsed.getBool(options.all_key)) |enabled| {
         if (enabled) return .{ .all = {} };
@@ -1944,11 +1999,11 @@ pub fn resolveSelectOrAllWithPromptIO(
 
     if (parsed.getString(options.select_key)) |selected| {
         if (options.choices.len > 0) {
-            if (pickChoiceByName(selected, options.choices, options.case_sensitive)) |matched| {
+            if (pickChoiceByName(selected, options.choices, case_sensitive)) |matched| {
                 return .{ .selected = matched };
             }
             if (options.allow_prefix_match) {
-                if (pickChoiceByUniquePrefix(selected, options.choices, options.case_sensitive)) |matched| {
+                if (pickChoiceByUniquePrefix(selected, options.choices, case_sensitive)) |matched| {
                     return .{ .selected = matched };
                 }
             }
@@ -1969,10 +2024,10 @@ pub fn resolveSelectOrAllWithPromptIO(
 
         if (answer.len == 0) {
             if (options.default_choice) |def| {
-                if (options.allow_all and equalsWithCase(def, "all", options.case_sensitive)) {
+                if (options.allow_all and equalsWithCase(def, "all", case_sensitive)) {
                     return .{ .all = {} };
                 }
-                if (pickChoiceByName(def, options.choices, options.case_sensitive)) |matched| {
+                if (pickChoiceByName(def, options.choices, case_sensitive)) |matched| {
                     return .{ .selected = matched };
                 }
             }
@@ -1980,7 +2035,7 @@ pub fn resolveSelectOrAllWithPromptIO(
             continue;
         }
 
-        if (options.allow_all and (equalsWithCase(answer, "all", options.case_sensitive) or std.mem.eql(u8, answer, "0"))) {
+        if (options.allow_all and (equalsWithCase(answer, "all", case_sensitive) or std.mem.eql(u8, answer, "0"))) {
             return .{ .all = {} };
         }
 
@@ -1991,12 +2046,12 @@ pub fn resolveSelectOrAllWithPromptIO(
             }
         }
 
-        if (pickChoiceByName(answer, options.choices, options.case_sensitive)) |matched| {
+        if (pickChoiceByName(answer, options.choices, case_sensitive)) |matched| {
             return .{ .selected = matched };
         }
 
         if (options.allow_prefix_match) {
-            if (pickChoiceByUniquePrefix(answer, options.choices, options.case_sensitive)) |matched| {
+            if (pickChoiceByUniquePrefix(answer, options.choices, case_sensitive)) |matched| {
                 return .{ .selected = matched };
             }
         }
@@ -2455,6 +2510,29 @@ test "ArgumentParser addFileOptionWithExtensions validates extension" {
     }
 }
 
+test "ArgumentParser addFileOptionWithExtensions inherits parser case sensitivity" {
+    const allocator = std.testing.allocator;
+
+    var ap = try ArgumentParser.init(allocator, .{
+        .name = "files",
+        .config = .{
+            .check_for_updates = false,
+            .case_sensitive = false,
+            .exit_on_error = false,
+            .silent_errors = true,
+        },
+    });
+    defer ap.deinit();
+
+    try ap.addFileOptionWithExtensions("input", &[_][]const u8{"json"}, .{});
+
+    const argv = [_][]const u8{ "--input", "CONFIG.JSON" };
+    var result = try ap.parse(&argv);
+    defer result.deinit();
+
+    try std.testing.expectEqualStrings("CONFIG.JSON", result.getString("input").?);
+}
+
 test "ArgumentParser addFileOptionWithExtensions supports must_exist" {
     const allocator = std.testing.allocator;
 
@@ -2534,6 +2612,29 @@ test "ArgumentParser addFileNameOptionWithExtensions validates extension" {
     }
 }
 
+test "ArgumentParser addFileNameOptionWithExtensions inherits parser case sensitivity" {
+    const allocator = std.testing.allocator;
+
+    var ap = try ArgumentParser.init(allocator, .{
+        .name = "files",
+        .config = .{
+            .check_for_updates = false,
+            .case_sensitive = false,
+            .exit_on_error = false,
+            .silent_errors = true,
+        },
+    });
+    defer ap.deinit();
+
+    try ap.addFileNameOptionWithExtensions("name", &[_][]const u8{"json"}, .{});
+
+    const argv = [_][]const u8{ "--name", "REPORT.JSON" };
+    var result = try ap.parse(&argv);
+    defer result.deinit();
+
+    try std.testing.expectEqualStrings("REPORT.JSON", result.getString("name").?);
+}
+
 test "ArgumentParser typed validation option helpers" {
     const allocator = std.testing.allocator;
 
@@ -2553,6 +2654,7 @@ test "ArgumentParser typed validation option helpers" {
     try ap.addYearOption("year", .{});
     try ap.addTimeOption("time", .{});
     try ap.addPortOption("port", .{});
+    try ap.addEndpointOption("service", .{});
     try ap.addJsonOption("payload", .{});
 
     const cwd_abs = try std.fs.cwd().realpathAlloc(allocator, ".");
@@ -2571,6 +2673,7 @@ test "ArgumentParser typed validation option helpers" {
             "--year",       "2026",
             "--time",       "15:30:10",
             "--port",       "8080",
+            "--service",    "api.example.com:443",
             "--workspace",  cwd_abs,
             "--payload",    "{\"ok\":true}",
         };
@@ -2581,26 +2684,32 @@ test "ArgumentParser typed validation option helpers" {
         try std.testing.expectEqualStrings("https://api.example.com/v1", result.getString("endpoint").?);
         try std.testing.expectEqualStrings("2026", result.getString("year").?);
         try std.testing.expectEqualStrings("15:30:10", result.getString("time").?);
+        try std.testing.expectEqualStrings("api.example.com:443", result.getString("service").?);
     }
 
     {
-        const argv = [_][]const u8{ "--email", "invalid" };
-        try std.testing.expectError(error.CustomValidationFailed, ap.parse(&argv));
+        const invalid_email_argv = [_][]const u8{ "--email", "invalid" };
+        try std.testing.expectError(error.CustomValidationFailed, ap.parse(&invalid_email_argv));
     }
 
     {
-        const argv = [_][]const u8{ "--host", "10.0.0.999" };
-        try std.testing.expectError(error.CustomValidationFailed, ap.parse(&argv));
+        const invalid_service_argv = [_][]const u8{ "--service", "api.example.com" };
+        try std.testing.expectError(error.CustomValidationFailed, ap.parse(&invalid_service_argv));
     }
 
     {
-        const argv = [_][]const u8{ "--hostname", "bad_host" };
-        try std.testing.expectError(error.CustomValidationFailed, ap.parse(&argv));
+        const invalid_host_argv = [_][]const u8{ "--host", "10.0.0.999" };
+        try std.testing.expectError(error.CustomValidationFailed, ap.parse(&invalid_host_argv));
     }
 
     {
-        const argv = [_][]const u8{ "--year", "26" };
-        try std.testing.expectError(error.CustomValidationFailed, ap.parse(&argv));
+        const invalid_hostname_argv = [_][]const u8{ "--hostname", "bad_host" };
+        try std.testing.expectError(error.CustomValidationFailed, ap.parse(&invalid_hostname_argv));
+    }
+
+    {
+        const invalid_year_argv = [_][]const u8{ "--year", "26" };
+        try std.testing.expectError(error.CustomValidationFailed, ap.parse(&invalid_year_argv));
     }
 
     {

@@ -115,8 +115,8 @@ pub inline fn parseFloat(s: []const u8) ?f64 {
 }
 
 /// Create an ArrayList writer for building strings.
-pub inline fn stringWriter(allocator: std.mem.Allocator) std.ArrayListUnmanaged(u8).Writer {
-    var list: std.ArrayListUnmanaged(u8) = .empty;
+pub inline fn stringWriter(allocator: std.mem.Allocator) std.ArrayList(u8).Writer {
+    var list: std.ArrayList(u8) = .empty;
     return list.writer(allocator);
 }
 

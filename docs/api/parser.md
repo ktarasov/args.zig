@@ -262,6 +262,18 @@ pub fn addFileNameOptionWithExtensions(
 ) !void
 ```
 
+### `addEndpointOption`
+
+Adds a validated endpoint option in `host:port` format.
+
+Example:
+
+```zig
+try parser.addEndpointOption("service", .{
+    .help = "Service endpoint (host:port)",
+});
+```
+
 Adds a file-name option constrained by allowed extensions.
 
 ### Typed Input Helper Methods
@@ -852,8 +864,8 @@ The result of parsing arguments.
 ```zig
 pub const ParseResult = struct {
     values: std.StringHashMap(ParsedValue),
-    positionals: std.ArrayListUnmanaged([]const u8),
-    remaining: std.ArrayListUnmanaged([]const u8),
+    positionals: std.ArrayList([]const u8),
+    remaining: std.ArrayList([]const u8),
     subcommand: ?[]const u8,
     subcommand_args: ?*ParseResult,
     allocator: std.mem.Allocator,

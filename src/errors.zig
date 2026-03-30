@@ -67,7 +67,7 @@ pub const ErrorContext = struct {
     suggestion: ?[]const u8 = null,
 
     pub fn format(self: ErrorContext, allocator: std.mem.Allocator) ![]const u8 {
-        var result: std.ArrayListUnmanaged(u8) = .empty;
+        var result: std.ArrayList(u8) = .empty;
         errdefer result.deinit(allocator);
         const writer = result.writer(allocator);
 

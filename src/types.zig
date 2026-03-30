@@ -226,9 +226,9 @@ pub const ParsingMode = enum {
 /// Result of parsing command-line arguments.
 pub const ParseResult = struct {
     values: std.StringHashMap(ParsedValue),
-    positionals: std.ArrayListUnmanaged([]const u8),
-    remaining: std.ArrayListUnmanaged([]const u8),
-    owned_slices: std.ArrayListUnmanaged([]const u8),
+    positionals: std.ArrayList([]const u8),
+    remaining: std.ArrayList([]const u8),
+    owned_slices: std.ArrayList([]const u8),
     subcommand: ?[]const u8,
     subcommand_args: ?*ParseResult,
     allocator: std.mem.Allocator,
