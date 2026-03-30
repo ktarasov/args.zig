@@ -32,6 +32,15 @@ The core parser is designed to minimize runtime allocations:
 2. **In-place Tokenization:** Command-line arguments are tokenized in-place whenever possible, pointing back to the original argument slice.
 3. **Lazy Execution:** Features like the update checker run in independent threads to ensure they don't block the main application startup.
 
+## Benchmark Coverage
+
+The benchmark suite in `bench/benchmark.zig` is organized by categories and now includes dedicated validation performance coverage:
+
+- Basic parsing paths
+- Advanced parser features
+- Validation flows (file extension checks and filename policy checks)
+- Help/completion generation
+
 ## Validation & Correctness
 
 Every utility function in the library is backed by comprehensive unit tests. We maintain a **100% pass rate** across over 100 tests covering:

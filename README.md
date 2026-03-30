@@ -510,6 +510,8 @@ Typical results on modern hardware (10,000 iterations):
 | Shell Completion (Bash)         | ~23 μs    | ~43,300 ops/sec  |
 | Declarative Structs             | ~29 μs    | ~34,600 ops/sec  |
 | Expect Validation               | ~18 μs    | ~56,400 ops/sec  |
+| File Extension Validation       | ~21 μs    | ~47,100 ops/sec  |
+| File Name Policy Validation     | ~22 μs    | ~46,200 ops/sec  |
 
 
 > [!NOTE]

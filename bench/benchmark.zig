@@ -17,6 +17,7 @@ const BenchmarkResult = struct {
     const categories = [_][]const u8{
         "Basic Parsing",
         "Advanced Features",
+        "Validation",
         "Generation",
     };
 };
@@ -96,69 +97,63 @@ fn runBenchmark(
     };
 }
 
+fn initBenchParser(allocator: std.mem.Allocator, name: []const u8) !args.ArgumentParser {
+    return args.ArgumentParser.init(allocator, .{
+        .name = name,
+        .config = args.Config.minimal(),
+    });
+}
+
+fn parseAndCleanup(parser: *args.ArgumentParser, argv: []const []const u8) !void {
+    var result = try parser.parse(argv);
+    result.deinit();
+}
+
 // -- Benchmark Functions --
 
 fn benchmarkSimpleFlags(allocator: std.mem.Allocator) !void {
     const test_args = [_][]const u8{ "-v", "-q", "--force" };
-    var parser = try args.ArgumentParser.init(allocator, .{
-        .name = "bench",
-        .config = args.Config.minimal(),
-    });
+    var parser = try initBenchParser(allocator, "bench");
+    defer parser.deinit();
     try parser.addFlag("verbose", .{ .short = 'v' });
     try parser.addFlag("quiet", .{ .short = 'q' });
     try parser.addFlag("force", .{});
-    var result = try parser.parse(&test_args);
-    result.deinit();
-    parser.deinit();
+    try parseAndCleanup(&parser, &test_args);
 }
 
 fn benchmarkMultipleOptions(allocator: std.mem.Allocator) !void {
     const test_args = [_][]const u8{ "-o", "output.txt", "-n", "42", "--config", "app.conf" };
-    var parser = try args.ArgumentParser.init(allocator, .{
-        .name = "bench",
-        .config = args.Config.minimal(),
-    });
+    var parser = try initBenchParser(allocator, "bench");
+    defer parser.deinit();
     try parser.addOption("output", .{ .short = 'o' });
     try parser.addOption("number", .{ .short = 'n', .value_type = .int });
     try parser.addOption("config", .{});
-    var result = try parser.parse(&test_args);
-    result.deinit();
-    parser.deinit();
+    try parseAndCleanup(&parser, &test_args);
 }
 
 fn benchmarkPositionals(allocator: std.mem.Allocator) !void {
     const test_args = [_][]const u8{ "input.txt", "output.txt", "backup.txt" };
-    var parser = try args.ArgumentParser.init(allocator, .{
-        .name = "bench",
-        .config = args.Config.minimal(),
-    });
+    var parser = try initBenchParser(allocator, "bench");
+    defer parser.deinit();
     try parser.addPositional("source", .{});
     try parser.addPositional("dest", .{});
     try parser.addPositional("backup", .{ .required = false });
-    var result = try parser.parse(&test_args);
-    result.deinit();
-    parser.deinit();
+    try parseAndCleanup(&parser, &test_args);
 }
 
 fn benchmarkCounters(allocator: std.mem.Allocator) !void {
     const test_args = [_][]const u8{ "-v", "-v", "-v", "-d", "-d" };
-    var parser = try args.ArgumentParser.init(allocator, .{
-        .name = "bench",
-        .config = args.Config.minimal(),
-    });
+    var parser = try initBenchParser(allocator, "bench");
+    defer parser.deinit();
     try parser.addCounter("verbose", .{ .short = 'v' });
     try parser.addCounter("debug", .{ .short = 'd' });
-    var result = try parser.parse(&test_args);
-    result.deinit();
-    parser.deinit();
+    try parseAndCleanup(&parser, &test_args);
 }
 
 fn benchmarkSubcommands(allocator: std.mem.Allocator) !void {
     const test_args = [_][]const u8{ "build", "--release", "--target", "native" };
-    var parser = try args.ArgumentParser.init(allocator, .{
-        .name = "bench",
-        .config = args.Config.minimal(),
-    });
+    var parser = try initBenchParser(allocator, "bench");
+    defer parser.deinit();
     try parser.addSubcommand(.{
         .name = "build",
         .help = "Build the project",
@@ -171,9 +166,7 @@ fn benchmarkSubcommands(allocator: std.mem.Allocator) !void {
         .name = "test",
         .help = "Run tests",
     });
-    var result = try parser.parse(&test_args);
-    result.deinit();
-    parser.deinit();
+    try parseAndCleanup(&parser, &test_args);
 }
 
 fn benchmarkMixedArgs(allocator: std.mem.Allocator) !void {
@@ -182,34 +175,26 @@ fn benchmarkMixedArgs(allocator: std.mem.Allocator) !void {
         "-n",       "100",        "--format",  "json",
         "--config", "config.yml", "input.txt",
     };
-    var parser = try args.ArgumentParser.init(allocator, .{
-        .name = "bench",
-        .config = args.Config.minimal(),
-    });
+    var parser = try initBenchParser(allocator, "bench");
+    defer parser.deinit();
     try parser.addCounter("verbose", .{ .short = 'v' });
     try parser.addOption("output", .{ .short = 'o' });
     try parser.addOption("number", .{ .short = 'n', .value_type = .int });
     try parser.addOption("format", .{ .short = 'f' });
     try parser.addOption("config", .{ .short = 'c' });
     try parser.addPositional("input", .{});
-    var result = try parser.parse(&test_args);
-    result.deinit();
-    parser.deinit();
+    try parseAndCleanup(&parser, &test_args);
 }
 
 fn benchmarkArgumentGroups(allocator: std.mem.Allocator) !void {
     const test_args = [_][]const u8{ "--host", "localhost", "-p", "8080" };
-    var parser = try args.ArgumentParser.init(allocator, .{
-        .name = "bench",
-        .config = args.Config.minimal(),
-    });
+    var parser = try initBenchParser(allocator, "bench");
+    defer parser.deinit();
     try parser.addArgumentGroup("Network", .{ .description = "Network options" });
     try parser.addOption("host", .{});
     try parser.addOption("port", .{ .short = 'p' });
     parser.setGroup(null);
-    var result = try parser.parse(&test_args);
-    result.deinit();
-    parser.deinit();
+    try parseAndCleanup(&parser, &test_args);
 }
 
 fn benchmarkHelpGeneration(allocator: std.mem.Allocator) !void {
@@ -244,10 +229,8 @@ fn benchmarkCompletionGeneration(allocator: std.mem.Allocator) !void {
 
 fn benchmarkCallbacks(allocator: std.mem.Allocator) !void {
     const test_args = [_][]const u8{ "-v", "-v", "--output", "file.txt" };
-    var parser = try args.ArgumentParser.init(allocator, .{
-        .name = "bench",
-        .config = args.Config.minimal(),
-    });
+    var parser = try initBenchParser(allocator, "bench");
+    defer parser.deinit();
 
     try parser.addArg(.{ .name = "verbose", .short = 'v', .action = .callback_flag, .callback = struct {
         fn cb(_: []const u8, _: ?[]const u8) void {}
@@ -257,24 +240,37 @@ fn benchmarkCallbacks(allocator: std.mem.Allocator) !void {
         fn cb(_: []const u8, _: ?[]const u8) void {}
     }.cb });
 
-    var result = try parser.parse(&test_args);
-    result.deinit();
-    parser.deinit();
+    try parseAndCleanup(&parser, &test_args);
 }
 
 fn benchmarkExpectValidation(allocator: std.mem.Allocator) !void {
     const test_args = [_][]const u8{ "-e", "prod" };
-    var parser = try args.ArgumentParser.init(allocator, .{
-        .name = "bench",
-        .config = args.Config.minimal(),
-    });
+    var parser = try initBenchParser(allocator, "bench");
+    defer parser.deinit();
     try parser.addOption("env", .{
         .short = 'e',
         .expect = &[_][]const u8{ "dev", "prod", "stage" },
     });
-    var result = try parser.parse(&test_args);
-    result.deinit();
-    parser.deinit();
+    try parseAndCleanup(&parser, &test_args);
+}
+
+fn benchmarkFileExtensionValidation(allocator: std.mem.Allocator) !void {
+    const test_args = [_][]const u8{ "--input", "settings.json" };
+    var parser = try initBenchParser(allocator, "bench");
+    defer parser.deinit();
+
+    try parser.addFileOptionWithExtensions("input", &[_][]const u8{ "json", "yaml", "toml" }, .{});
+    try parseAndCleanup(&parser, &test_args);
+}
+
+fn benchmarkFileNamePolicyValidation(allocator: std.mem.Allocator) !void {
+    const test_args = [_][]const u8{ "--output-name", "result.json" };
+    var parser = try initBenchParser(allocator, "bench");
+    defer parser.deinit();
+
+    const output_name_validator = args.Validators.filePolicy(&[_][]const u8{"json"}, false, 3, 64);
+    try parser.addFileNameOption("output-name", .{ .validator = output_name_validator });
+    try parseAndCleanup(&parser, &test_args);
 }
 
 fn benchmarkStructParsing(allocator: std.mem.Allocator) !void {
@@ -316,6 +312,10 @@ pub fn main() !void {
     try results.append(allocator, try runBenchmark("Callbacks", allocator, benchmarkCallbacks, "Advanced Features"));
     try results.append(allocator, try runBenchmark("Expect Validation", allocator, benchmarkExpectValidation, "Advanced Features"));
     try results.append(allocator, try runBenchmark("Declarative Structs", allocator, benchmarkStructParsing, "Advanced Features"));
+
+    // Validation
+    try results.append(allocator, try runBenchmark("File Extension Validation", allocator, benchmarkFileExtensionValidation, "Validation"));
+    try results.append(allocator, try runBenchmark("File Name Policy Validation", allocator, benchmarkFileNamePolicyValidation, "Validation"));
 
     // Generation
     try results.append(allocator, try runBenchmark("Help Text Generation", allocator, benchmarkHelpGeneration, "Generation"));

@@ -21,6 +21,7 @@ head:
 - Added include/exclude helpers (`addIncludeExclude`) with parsed list resolver utilities.
 - Added strict include/exclude resolver (`resolveIncludeExcludeStrict`) with canonicalization, dedupe, and conflict detection.
 - Added reusable file/path helpers with extension validation (`addPathOption`, `addFileOption`, `addDirectoryOption`, `addFileOptionWithExtensions`).
+- Expanded benchmark coverage with validation-focused measurements (file extension checks and filename policy checks).
 
 args.zig includes an optional non-blocking update checker that notifies users when a new version is available. By default, this feature is **enabled**. This guide explains how to configure or disable it.
 
