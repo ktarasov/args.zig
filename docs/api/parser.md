@@ -274,8 +274,6 @@ try parser.addEndpointOption("service", .{
 });
 ```
 
-Adds a file-name option constrained by allowed extensions.
-
 ### Typed Input Helper Methods
 
 The parser includes one-call helpers for common input formats:
@@ -283,8 +281,12 @@ The parser includes one-call helpers for common input formats:
 - `addEmailOption`
 - `addUrlOption`
 - `addIpv4Option`
+- `addIpOption`
+- `addIpv6Option`
 - `addHostNameOption`
 - `addPortOption`
+- `addEndpointOption`
+- `addKeyValueOption`
 - `addUuidOption`
 - `addIsoDateOption`
 - `addIsoDateTimeOption`
@@ -294,6 +296,54 @@ The parser includes one-call helpers for common input formats:
 - `addAbsolutePathOption`
 
 Each helper adds a `.string` option with an appropriate built-in validator.
+
+Common helper option fields:
+
+- `short`, `help`, `default`, `required`
+- `metavar`, `dest`, `env_var`
+- `hidden`, `aliases`, `deprecated`
+- `validator` (override default built-in validator)
+- `expect`
+
+Example:
+
+```zig
+try parser.addEmailOption("email", .{
+    .short = 'e',
+    .required = true,
+    .env_var = "APP_EMAIL",
+});
+
+try parser.addEndpointOption("service", .{
+    .help = "Service endpoint in host:port format",
+    .default = "localhost:8080",
+});
+
+try parser.addIpv6Option("host-v6", .{
+    .help = "Service IPv6 address",
+});
+
+try parser.addIpOption("host-any", .{
+    .help = "Service IP address (IPv4 or IPv6)",
+});
+
+try parser.addKeyValueOption("label", .{
+    .help = "Metadata label as key=value",
+});
+
+try parser.addOption("retries", .{
+    .value_type = .int,
+    .validator = args.Validators.intRange(1, 10),
+    .default = "3",
+});
+
+var result = try parser.parseProcess();
+defer result.deinit();
+
+const service = result.getString("service") orelse "localhost:8080";
+const retries = result.getInt("retries") orelse 3;
+const label = result.getKeyValue("label");
+```
 
 ### Validator Aliases (Top-Level)
 
@@ -320,7 +370,7 @@ pub const PromptSelectOrAllOptions = struct {
     choices: []const []const u8,
     default_choice: ?[]const u8 = null,
     allow_all: bool = true,
-    case_sensitive: bool = false,
+    case_sensitive: ?bool = null,
     allow_prefix_match: bool = true,
     suggest_closest: bool = true,
     max_suggestion_distance: usize = 3,

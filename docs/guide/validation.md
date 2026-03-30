@@ -98,9 +98,12 @@ args.zig also provides reusable validators for common app and API inputs:
 - `Validators.emailAddress` / `Validators.email`
 - `Validators.httpUrl` / `Validators.url`
 - `Validators.ipv4` / `Validators.ip`
+- `Validators.ipv6`
+- `Validators.ipAny` / `Validators.anyIp`
 - `Validators.hostname`
 - `Validators.port`
 - `Validators.endpoint` / `Validators.hostPort`
+- `Validators.keyValuePair` / `Validators.keyValue`
 - `Validators.uuid`
 - `Validators.isoDate` / `Validators.date`
 - `Validators.isoDateTime` / `Validators.dateTime`
@@ -116,6 +119,10 @@ You can use them directly:
 ```zig
 try parser.addOption("email", .{ .validator = args.Validators.email });
 try parser.addOption("endpoint", .{ .validator = args.Validators.url });
+try parser.addOption("host-v6", .{ .validator = args.Validators.ipv6 });
+try parser.addOption("any-ip", .{ .validator = args.Validators.anyIp });
+try parser.addOption("peer", .{ .validator = args.Validators.anyIp });
+try parser.addOption("label", .{ .value_type = .key_value, .validator = args.Validators.keyValuePair });
 try parser.addOption("run-date", .{ .validator = args.Validators.date });
 ```
 
@@ -125,9 +132,12 @@ Or use high-level parser helpers:
 try parser.addEmailOption("email", .{});
 try parser.addUrlOption("endpoint", .{});
 try parser.addIpv4Option("host", .{});
+try parser.addIpOption("host-any", .{});
+try parser.addIpv6Option("host-v6", .{});
 try parser.addHostNameOption("hostname", .{});
 try parser.addPortOption("port", .{});
 try parser.addEndpointOption("service", .{}); // host:port
+try parser.addKeyValueOption("label", .{}); // key=value
 try parser.addUuidOption("request-id", .{});
 try parser.addIsoDateOption("run-date", .{});
 try parser.addIsoDateTimeOption("timestamp", .{});
@@ -136,6 +146,65 @@ try parser.addTimeOption("time", .{});
 try parser.addAbsolutePathOption("workspace", .{});
 try parser.addJsonOption("payload", .{});
 ```
+
+### Typed Helper Options (Setting Values)
+
+Every typed helper accepts the same practical option fields used by `addOption` for day-to-day CLI design:
+
+- `.short` for short flags like `-e`
+- `.help` for help text
+- `.default` for fallback values
+- `.required` to force user input
+- `.env_var` to read from environment variables
+- `.aliases` for alternate long names
+- `.validator` to override the default built-in validator
+
+```zig
+try parser.addEmailOption("email", .{
+    .short = 'e',
+    .help = "User email",
+    .required = true,
+    .env_var = "APP_EMAIL",
+});
+
+try parser.addEndpointOption("service", .{
+    .help = "Service endpoint in host:port format",
+    .default = "localhost:8080",
+});
+
+try parser.addOption("retries", .{
+    .short = 'r',
+    .help = "Retry count (1-10)",
+    .value_type = .int,
+    .validator = args.Validators.intRange(1, 10),
+    .default = "3",
+});
+```
+
+### Getting Values After Parse
+
+Most typed helper values are stored as strings, so retrieve them with `getString(...)`.
+For numeric options where you set `.value_type = .int`, use `getInt(...)`.
+
+```zig
+var parsed = try parser.parseProcess();
+defer parsed.deinit();
+
+const email = parsed.getString("email") orelse "";
+const service = parsed.getString("service") orelse "localhost:8080";
+const retries = parsed.getInt("retries") orelse 3;
+```
+
+### CLI Example
+
+```bash
+myapp \
+  --email ops@example.com \
+  --service api.example.com:443 \
+  --retries 5
+```
+
+When a value is missing, defaults and environment fallbacks are used (if configured).
 
 ## Validator Composition
 

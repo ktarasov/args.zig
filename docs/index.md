@@ -135,4 +135,4 @@ exe.root_module.addImport("args", args_dep.module("args"));
 ## Current Version
 
 - **Package Version:** 0.0.4
-- **Minimum Zig Version:** 0.15.1
+- **Minimum Zig Version:** 0.15.0

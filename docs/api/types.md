@@ -327,7 +327,10 @@ pub const PromptSelectOrAllOptions = struct {
     choices: []const []const u8,
     default_choice: ?[]const u8 = null,
     allow_all: bool = true,
-    case_sensitive: bool = false,
+    case_sensitive: ?bool = null,
+    allow_prefix_match: bool = true,
+    suggest_closest: bool = true,
+    max_suggestion_distance: usize = 3,
     max_attempts: usize = 3,
 };
 

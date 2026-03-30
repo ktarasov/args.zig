@@ -13,7 +13,7 @@ This guide will help you get started with args.zig in your Zig project.
 
 ## Requirements
 
-- **Zig 0.15.1** or later
+- **Zig 0.15.0** or later
 - A Zig project with `build.zig` and `build.zig.zon`
 
 ## Installation

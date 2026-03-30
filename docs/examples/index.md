@@ -335,8 +335,12 @@ zig build run-file_support
 - `addEmailOption`
 - `addUrlOption`
 - `addIpv4Option`
+- `addIpOption`
+- `addIpv6Option`
 - `addHostNameOption`
 - `addPortOption`
+- `addEndpointOption`
+- `addKeyValueOption`
 - `addUuidOption`
 - `addIsoDateOption` and `addIsoDateTimeOption`
 - `addYearOption` and `addTimeOption`
@@ -344,10 +348,44 @@ zig build run-file_support
 - `addJsonOption`
 - Numeric range validation via `Validators.intRange(...)`
 
+This example also shows how to read validated values after parse:
+
+- Use `getString("...")` for helper-backed string values
+- Use `getInt("retries")` when the option is configured with `.value_type = .int`
+- Use `getKeyValue("label")` for options configured as `KEY=VALUE`
+
 Run it with:
 
 ```bash
 zig build run-data_input_validation
+```
+
+Try a direct invocation shape:
+
+```bash
+zig build run-data_input_validation -- \
+    --email ops@example.com \
+    --endpoint https://api.example.com/v1/tasks \
+    --host-v6 2001:db8::1 \
+    --service api.example.com:443 \
+    --retries 4
+```
+
+## Network Endpoints Example
+
+`examples/network_endpoints.zig` demonstrates network-centric typed helpers:
+
+- `addIpv4Option` for IPv4 addresses
+- `addIpOption` for a single IPv4-or-IPv6 input
+- `addIpv6Option` for IPv6 literals
+- `addEndpointOption` for `host:port` and `[ipv6]:port`
+- `addPortOption` for explicit port validation
+- Numeric retries via `.value_type = .int` + `Validators.intRange(...)`
+
+Run it with:
+
+```bash
+zig build run-network_endpoints
 ```
 
 ## Counters and Choices Example
@@ -415,7 +453,7 @@ logger -v                   # Verbosity: 1
 logger -vv                  # Verbosity: 2
 logger -vvv -l debug        # Verbosity: 3, level: debug
 logger --level error        # level: error
-logger --level error        # level: error
+logger --level warn         # level: warn
 logger -f json              # format: json
 ```
 
@@ -613,11 +651,11 @@ Build and run examples with:
 zig build
 
 # Run basic example
-zig build run-basic -- -v --output result.txt input.txt
+zig build run-basic
 
 # Run advanced example
-zig build run-advanced -- init myproject --template advanced
+zig build run-advanced
 
 # Run update check example
-zig build run-update-check
+zig build run-update_check
 ```

@@ -3,7 +3,7 @@
 <img  alt="cover" src="https://github.com/user-attachments/assets/6b4390a1-af10-4175-8c8b-c36f3868b398" />
 
 <a href="https://muhammad-fiaz.github.io/args.zig/"><img src="https://img.shields.io/badge/docs-muhammad--fiaz.github.io-blue" alt="Documentation"></a>
-<a href="https://ziglang.org/"><img src="https://img.shields.io/badge/Zig-0.15.1+-orange.svg?logo=zig" alt="Zig Version"></a>
+<a href="https://ziglang.org/"><img src="https://img.shields.io/badge/Zig-0.15.0+-orange.svg?logo=zig" alt="Zig Version"></a>
 <a href="https://github.com/muhammad-fiaz/args.zig"><img src="https://img.shields.io/github/stars/muhammad-fiaz/args.zig" alt="GitHub stars"></a>
 <a href="https://github.com/muhammad-fiaz/args.zig/issues"><img src="https://img.shields.io/github/issues/muhammad-fiaz/args.zig" alt="GitHub issues"></a>
 <a href="https://github.com/muhammad-fiaz/args.zig/pulls"><img src="https://img.shields.io/github/issues-pr/muhammad-fiaz/args.zig" alt="GitHub pull requests"></a>
@@ -148,6 +148,17 @@ pub fn main() !void {
 
 ## Examples
 
+Brief usage pattern:
+
+```zig
+var parser = try args.ArgumentParser.init(allocator, .{ .name = "app" });
+defer parser.deinit();
+try parser.addFlag("verbose", .{ .short = 'v' });
+try parser.addOption("output", .{ .short = 'o' });
+var result = try parser.parseProcess();
+defer result.deinit();
+```
+
 ### Flags and Options
 
 ```zig
@@ -218,6 +229,47 @@ try parser.addOption("token", .{
 });
 ```
 
+### Typed Input Validation Helpers
+
+Use dedicated helpers for common API and configuration inputs:
+
+```zig
+try parser.addEmailOption("email", .{ .short = 'e', .required = true, .env_var = "APP_EMAIL" });
+try parser.addUrlOption("endpoint", .{});
+try parser.addIpv4Option("host", .{});
+try parser.addIpOption("host-any", .{}); // IPv4 or IPv6
+try parser.addIpv6Option("host-v6", .{});
+try parser.addHostNameOption("hostname", .{});
+try parser.addPortOption("port", .{});
+try parser.addEndpointOption("service", .{}); // host:port
+try parser.addKeyValueOption("label", .{});   // key=value
+try parser.addUuidOption("request-id", .{});
+try parser.addIsoDateOption("run-date", .{});
+try parser.addIsoDateTimeOption("timestamp", .{});
+try parser.addYearOption("year", .{});
+try parser.addTimeOption("time", .{});
+try parser.addAbsolutePathOption("workspace", .{});
+try parser.addJsonOption("payload", .{});
+
+try parser.addOption("retries", .{
+    .value_type = .int,
+    .validator = args.Validators.intRange(1, 10),
+    .default = "3",
+});
+
+try parser.addOption("peer", .{
+    .validator = args.Validators.anyIp,
+});
+
+var result = try parser.parseProcess();
+defer result.deinit();
+
+const email = result.getString("email") orelse "";
+const service = result.getString("service") orelse "localhost:8080";
+const retries = result.getInt("retries") orelse 3;
+const label = result.getKeyValue("label");
+```
+
 ### Negated Long Flags
 
 Long boolean flags support `--no-<name>` by default:
@@ -266,29 +318,6 @@ var resolved = try args.resolveSelectOrAllStrict(allocator, &result, .{
     .dedupe = true,
 });
 defer resolved.deinit();
-```
-
-### Typed Input Validation Helpers
-
-Use dedicated helpers for common API/configuration inputs:
-
-```zig
-try parser.addEmailOption("email", .{});
-try parser.addUrlOption("endpoint", .{});
-try parser.addIpv4Option("host", .{});
-try parser.addHostNameOption("hostname", .{});
-try parser.addPortOption("port", .{});
-try parser.addUuidOption("request-id", .{});
-try parser.addIsoDateOption("run-date", .{});
-try parser.addIsoDateTimeOption("timestamp", .{});
-try parser.addYearOption("year", .{});
-try parser.addTimeOption("time", .{});
-try parser.addAbsolutePathOption("workspace", .{});
-try parser.addJsonOption("payload", .{});
-
-try parser.addOption("retries", .{
-    .validator = args.Validators.intRange(1, 10),
-});
 ```
 
 ### Question-Based Selection Flow
@@ -512,6 +541,8 @@ zig build run-include_exclude
 zig build run-include_exclude_strict
 zig build run-file_support
 zig build run-data_input_validation
+zig build run-network_endpoints
+zig build run-update_check
 
 # Run benchmarks
 zig build bench
@@ -558,7 +589,7 @@ Typical results on modern hardware (10,000 iterations):
 
 
 > [!NOTE]
-> Results vary based on hardware and system load. Tested on Windows x86_64 with Zig 0.15.1.
+> Results vary based on hardware and system load. Tested on Windows x86_64 with Zig 0.15.0.
 > If you want the latest release benchmarks, you can find them on the repository [releases](https://github.com/muhammad-fiaz/args.zig/releases).
 
 ## Documentation

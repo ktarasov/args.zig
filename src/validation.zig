@@ -331,7 +331,8 @@ pub fn validatePort(value: []const u8) bool {
     return parsed >= 1;
 }
 
-fn validateIpv6Literal(value: []const u8) bool {
+/// Validates IPv6 address literals (compressed and mixed forms).
+pub fn validateIPv6Address(value: []const u8) bool {
     if (value.len < 2) return false;
 
     var has_colon = false;
@@ -359,7 +360,7 @@ pub fn validateEndpoint(value: []const u8) bool {
 
         const host = value[1..end_idx];
         const port = value[end_idx + 2 ..];
-        return validateIpv6Literal(host) and validatePort(port);
+        return validateIPv6Address(host) and validatePort(port);
     }
 
     const colon_idx = std.mem.lastIndexOfScalar(u8, value, ':') orelse return false;
@@ -370,6 +371,14 @@ pub fn validateEndpoint(value: []const u8) bool {
     if (!validatePort(port)) return false;
 
     return validateHostName(host) or validateIPv4Address(host);
+}
+
+/// Validates KEY=VALUE syntax where both key and value are non-empty.
+pub fn validateKeyValuePair(value: []const u8) bool {
+    const idx = std.mem.indexOfScalar(u8, value, '=') orelse return false;
+    if (idx == 0) return false;
+    if (idx + 1 >= value.len) return false;
+    return true;
 }
 
 fn ensureAllowedExtension(value: []const u8, allowed_extensions: []const []const u8, case_sensitive: bool) ValidationResult {
@@ -449,6 +458,14 @@ pub const Validators = struct {
         return if (validateIPv4Address(value)) .{ .ok = {} } else .{ .err = "invalid IPv4 address" };
     }
 
+    pub fn ipv6(value: []const u8) ValidationResult {
+        return if (validateIPv6Address(value)) .{ .ok = {} } else .{ .err = "invalid IPv6 address" };
+    }
+
+    pub fn ipAny(value: []const u8) ValidationResult {
+        return if (validateIPv4Address(value) or validateIPv6Address(value)) .{ .ok = {} } else .{ .err = "invalid IP address" };
+    }
+
     pub fn uuid(value: []const u8) ValidationResult {
         return if (validateUuid(value)) .{ .ok = {} } else .{ .err = "invalid UUID" };
     }
@@ -483,6 +500,10 @@ pub const Validators = struct {
 
     pub fn endpoint(value: []const u8) ValidationResult {
         return if (validateEndpoint(value)) .{ .ok = {} } else .{ .err = "invalid endpoint (expected host:port)" };
+    }
+
+    pub fn keyValuePair(value: []const u8) ValidationResult {
+        return if (validateKeyValuePair(value)) .{ .ok = {} } else .{ .err = "invalid key=value pair" };
     }
 
     pub fn intRange(comptime min: ?i64, comptime max: ?i64) ValidatorFn {
@@ -637,6 +658,8 @@ pub const Validators = struct {
     pub const email = emailAddress;
     pub const url = httpUrl;
     pub const ip = ipv4;
+    pub const anyIp = ipAny;
+    pub const keyValue = keyValuePair;
     pub const hostPort = endpoint;
     pub const date = isoDate;
     pub const dateTime = isoDateTime;
@@ -795,6 +818,10 @@ test "email, URL, IP, UUID validators" {
     try std.testing.expect(validateIPv4Address("192.168.1.10"));
     try std.testing.expect(!validateIPv4Address("256.1.1.1"));
 
+    try std.testing.expect(validateIPv6Address("2001:db8::1"));
+    try std.testing.expect(validateIPv6Address("::1"));
+    try std.testing.expect(!validateIPv6Address("not-an-ip"));
+
     try std.testing.expect(validateUuid("123e4567-e89b-12d3-a456-426614174000"));
     try std.testing.expect(!validateUuid("not-a-uuid"));
 }
@@ -855,4 +882,23 @@ test "Validators intRange and floatRange" {
     try std.testing.expect(float_validator("0.5").isOk());
     try std.testing.expect(!float_validator("2.0").isOk());
     try std.testing.expect(!float_validator("bad").isOk());
+}
+
+test "Validators ipv6 and ipAny" {
+    try std.testing.expect(Validators.ipv6("2001:db8::8a2e:370:7334").isOk());
+    try std.testing.expect(!Validators.ipv6("invalid-v6").isOk());
+
+    try std.testing.expect(Validators.ipAny("192.168.0.1").isOk());
+    try std.testing.expect(Validators.ipAny("fe80::1").isOk());
+    try std.testing.expect(!Validators.ipAny("hostname").isOk());
+}
+
+test "Validators keyValuePair" {
+    try std.testing.expect(validateKeyValuePair("env=prod"));
+    try std.testing.expect(!validateKeyValuePair("env="));
+    try std.testing.expect(!validateKeyValuePair("=prod"));
+    try std.testing.expect(!validateKeyValuePair("novalue"));
+
+    try std.testing.expect(Validators.keyValuePair("k=v").isOk());
+    try std.testing.expect(!Validators.keyValuePair("k=").isOk());
 }

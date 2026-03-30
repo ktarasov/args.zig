@@ -614,6 +614,68 @@ pub const ArgumentParser = struct {
         });
     }
 
+    /// Adds an IP address option (accepts IPv4 or IPv6).
+    pub fn addIpOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = "IP",
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        validator: ?validation.ValidatorFn = null,
+        expect: []const []const u8 = &.{},
+    }) !void {
+        const validator_fn = options.validator orelse validation.Validators.ipAny;
+        try self.addValidatedStringOption(name, validator_fn, .{
+            .short = options.short,
+            .help = options.help,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .expect = options.expect,
+        });
+    }
+
+    /// Adds an IPv6 address option.
+    pub fn addIpv6Option(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = "IPV6",
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        validator: ?validation.ValidatorFn = null,
+        expect: []const []const u8 = &.{},
+    }) !void {
+        const validator_fn = options.validator orelse validation.Validators.ipv6;
+        try self.addValidatedStringOption(name, validator_fn, .{
+            .short = options.short,
+            .help = options.help,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .expect = options.expect,
+        });
+    }
+
     /// Adds a hostname option.
     pub fn addHostNameOption(self: *ArgumentParser, name: []const u8, options: struct {
         short: ?u8 = null,
@@ -765,6 +827,46 @@ pub const ArgumentParser = struct {
             .hidden = options.hidden,
             .aliases = options.aliases,
             .deprecated = options.deprecated,
+            .expect = options.expect,
+        });
+    }
+
+    /// Adds a key=value option (`ValueType.key_value`) with optional strict key/value validation.
+    pub fn addKeyValueOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = "KEY=VALUE",
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        validator: ?validation.ValidatorFn = null,
+        expect: []const []const u8 = &.{},
+        require_non_empty: bool = true,
+    }) !void {
+        const validator_fn: ?validation.ValidatorFn = if (options.validator) |v|
+            v
+        else if (options.require_non_empty)
+            validation.Validators.keyValuePair
+        else
+            null;
+
+        try self.addOption(name, .{
+            .short = options.short,
+            .help = options.help,
+            .value_type = .key_value,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .validator = validator_fn,
             .expect = options.expect,
         });
     }
@@ -2647,6 +2749,8 @@ test "ArgumentParser typed validation option helpers" {
     try ap.addEmailOption("email", .{});
     try ap.addUrlOption("endpoint", .{});
     try ap.addIpv4Option("host", .{});
+    try ap.addIpOption("host-any", .{});
+    try ap.addIpv6Option("host-v6", .{});
     try ap.addHostNameOption("hostname", .{});
     try ap.addUuidOption("request-id", .{});
     try ap.addIsoDateOption("date", .{});
@@ -2655,6 +2759,7 @@ test "ArgumentParser typed validation option helpers" {
     try ap.addTimeOption("time", .{});
     try ap.addPortOption("port", .{});
     try ap.addEndpointOption("service", .{});
+    try ap.addKeyValueOption("label", .{});
     try ap.addJsonOption("payload", .{});
 
     const cwd_abs = try std.fs.cwd().realpathAlloc(allocator, ".");
@@ -2666,6 +2771,8 @@ test "ArgumentParser typed validation option helpers" {
             "--email",      "user@example.com",
             "--endpoint",   "https://api.example.com/v1",
             "--host",       "10.0.0.8",
+            "--host-any",   "fe80::1",
+            "--host-v6",    "2001:db8::1",
             "--hostname",   "api.example.com",
             "--request-id", "123e4567-e89b-12d3-a456-426614174000",
             "--date",       "2026-03-30",
@@ -2674,6 +2781,7 @@ test "ArgumentParser typed validation option helpers" {
             "--time",       "15:30:10",
             "--port",       "8080",
             "--service",    "api.example.com:443",
+            "--label",      "env=prod",
             "--workspace",  cwd_abs,
             "--payload",    "{\"ok\":true}",
         };
@@ -2684,7 +2792,12 @@ test "ArgumentParser typed validation option helpers" {
         try std.testing.expectEqualStrings("https://api.example.com/v1", result.getString("endpoint").?);
         try std.testing.expectEqualStrings("2026", result.getString("year").?);
         try std.testing.expectEqualStrings("15:30:10", result.getString("time").?);
+        try std.testing.expectEqualStrings("fe80::1", result.getString("host-any").?);
+        try std.testing.expectEqualStrings("2001:db8::1", result.getString("host-v6").?);
         try std.testing.expectEqualStrings("api.example.com:443", result.getString("service").?);
+        const label = result.getKeyValue("label").?;
+        try std.testing.expectEqualStrings("env", label.key);
+        try std.testing.expectEqualStrings("prod", label.value);
     }
 
     {
@@ -2700,6 +2813,16 @@ test "ArgumentParser typed validation option helpers" {
     {
         const invalid_host_argv = [_][]const u8{ "--host", "10.0.0.999" };
         try std.testing.expectError(error.CustomValidationFailed, ap.parse(&invalid_host_argv));
+    }
+
+    {
+        const invalid_host_v6_argv = [_][]const u8{ "--host-v6", "invalid-v6" };
+        try std.testing.expectError(error.CustomValidationFailed, ap.parse(&invalid_host_v6_argv));
+    }
+
+    {
+        const invalid_host_any_argv = [_][]const u8{ "--host-any", "not-an-ip" };
+        try std.testing.expectError(error.CustomValidationFailed, ap.parse(&invalid_host_any_argv));
     }
 
     {
@@ -2724,6 +2847,11 @@ test "ArgumentParser typed validation option helpers" {
 
     {
         const argv = [_][]const u8{ "--port", "70000" };
+        try std.testing.expectError(error.CustomValidationFailed, ap.parse(&argv));
+    }
+
+    {
+        const argv = [_][]const u8{ "--label", "env=" };
         try std.testing.expectError(error.CustomValidationFailed, ap.parse(&argv));
     }
 }

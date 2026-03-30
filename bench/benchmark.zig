@@ -295,7 +295,11 @@ fn benchmarkTypedInputValidation(allocator: std.mem.Allocator) !void {
         "--email",      "ops@example.com",
         "--endpoint",   "https://api.example.com/v1",
         "--host",       "10.0.0.8",
+        "--host-any",   "fe80::1",
+        "--host-v6",    "2001:db8::1",
         "--hostname",   "api.example.com",
+        "--service",    "api.example.com:443",
+        "--label",      "env=prod",
         "--request-id", "123e4567-e89b-12d3-a456-426614174000",
         "--run-date",   "2026-03-30",
         "--timestamp",  "2026-03-30T15:30:10Z",
@@ -312,7 +316,11 @@ fn benchmarkTypedInputValidation(allocator: std.mem.Allocator) !void {
     try parser.addEmailOption("email", .{});
     try parser.addUrlOption("endpoint", .{});
     try parser.addIpv4Option("host", .{});
+    try parser.addIpOption("host-any", .{});
+    try parser.addIpv6Option("host-v6", .{});
     try parser.addHostNameOption("hostname", .{});
+    try parser.addEndpointOption("service", .{});
+    try parser.addKeyValueOption("label", .{});
     try parser.addUuidOption("request-id", .{});
     try parser.addIsoDateOption("run-date", .{});
     try parser.addIsoDateTimeOption("timestamp", .{});
