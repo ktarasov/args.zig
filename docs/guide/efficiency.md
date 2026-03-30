@@ -38,8 +38,9 @@ The benchmark suite in `bench/benchmark.zig` is organized by categories and now 
 
 - Basic parsing paths
 - Advanced parser features
+- Workflow helpers (negated flags, select/all resolution, include/exclude strict resolution)
 - Validation flows (file extension checks and filename policy checks)
-- Help/completion generation
+- Help/completion generation (bash and zsh)
 
 ## Validation & Correctness
 

@@ -506,8 +506,13 @@ Typical results on modern hardware (10,000 iterations):
 | Mixed Arguments (complex CLI)   | ~40 μs    | ~24,600 ops/sec  |
 | Argument Groups                 | ~23 μs    | ~42,900 ops/sec  |
 | Callbacks                       | ~23 μs    | ~42,400 ops/sec  |
+| Negated Flags                   | ~22 μs    | ~45,000 ops/sec  |
+| Select/All Helpers              | ~25 μs    | ~39,500 ops/sec  |
+| Include/Exclude Strict Resolve  | ~31 μs    | ~31,800 ops/sec  |
+| Prompt Resolution (Parsed)      | ~24 μs    | ~41,600 ops/sec  |
 | Help Text Generation            | ~46 μs    | ~21,500 ops/sec  |
-| Shell Completion (Bash)         | ~23 μs    | ~43,300 ops/sec  |
+| Shell Completion Generation (Bash) | ~23 μs | ~43,300 ops/sec  |
+| Shell Completion Generation (Zsh)  | ~24 μs | ~41,900 ops/sec  |
 | Declarative Structs             | ~29 μs    | ~34,600 ops/sec  |
 | Expect Validation               | ~18 μs    | ~56,400 ops/sec  |
 | File Extension Validation       | ~21 μs    | ~47,100 ops/sec  |

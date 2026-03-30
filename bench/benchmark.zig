@@ -17,6 +17,7 @@ const BenchmarkResult = struct {
     const categories = [_][]const u8{
         "Basic Parsing",
         "Advanced Features",
+        "Workflow Helpers",
         "Validation",
         "Generation",
     };
@@ -227,6 +228,19 @@ fn benchmarkCompletionGeneration(allocator: std.mem.Allocator) !void {
     parser.deinit();
 }
 
+fn benchmarkCompletionGenerationZsh(allocator: std.mem.Allocator) !void {
+    var parser = try args.ArgumentParser.init(allocator, .{
+        .name = "myapp",
+        .version = "1.0.0",
+        .config = args.Config.minimal(),
+    });
+    try parser.addFlag("verbose", .{ .short = 'v', .help = "Enable verbose output" });
+    try parser.addOption("output", .{ .short = 'o', .help = "Output file" });
+    const completion = try parser.generateCompletion(.zsh);
+    allocator.free(completion);
+    parser.deinit();
+}
+
 fn benchmarkCallbacks(allocator: std.mem.Allocator) !void {
     const test_args = [_][]const u8{ "-v", "-v", "--output", "file.txt" };
     var parser = try initBenchParser(allocator, "bench");
@@ -288,6 +302,70 @@ fn benchmarkStructParsing(allocator: std.mem.Allocator) !void {
     parsed.deinit();
 }
 
+fn benchmarkNegatedFlags(allocator: std.mem.Allocator) !void {
+    const test_args = [_][]const u8{ "--no-cache", "--color" };
+    var parser = try initBenchParser(allocator, "bench");
+    defer parser.deinit();
+
+    try parser.addFlag("cache", .{});
+    try parser.addFalseFlag("color", .{});
+    try parseAndCleanup(&parser, &test_args);
+}
+
+fn benchmarkSelectOrAllHelpers(allocator: std.mem.Allocator) !void {
+    const test_args = [_][]const u8{ "--select", "users" };
+    var parser = try initBenchParser(allocator, "bench");
+    defer parser.deinit();
+
+    try parser.addSelectOrAll(.{
+        .select_choices = &[_][]const u8{ "users", "groups", "logs" },
+    });
+    try parseAndCleanup(&parser, &test_args);
+}
+
+fn benchmarkIncludeExcludeStrict(allocator: std.mem.Allocator) !void {
+    const test_args = [_][]const u8{ "--include", "users,groups", "--exclude", "logs" };
+    var parser = try initBenchParser(allocator, "bench");
+    defer parser.deinit();
+
+    try parser.addIncludeExclude(.{});
+
+    var result = try parser.parse(&test_args);
+    defer result.deinit();
+
+    var filters = try args.resolveIncludeExcludeStrict(allocator, &result, .{
+        .choices = &[_][]const u8{ "users", "groups", "logs" },
+        .all_keyword = "all",
+    });
+    defer filters.deinit();
+}
+
+fn benchmarkPromptResolutionParsed(allocator: std.mem.Allocator) !void {
+    const test_args = [_][]const u8{"--all"};
+    var parser = try initBenchParser(allocator, "bench");
+    defer parser.deinit();
+
+    try parser.addSelectOrAll(.{
+        .select_choices = &[_][]const u8{ "users", "groups", "logs" },
+    });
+
+    var parsed = try parser.parse(&test_args);
+    defer parsed.deinit();
+
+    var input_stream = std.io.fixedBufferStream("");
+    var output_buf: [64]u8 = undefined;
+    var output_stream = std.io.fixedBufferStream(&output_buf);
+
+    const decision = try args.resolveSelectOrAllWithPromptIO(
+        allocator,
+        &parsed,
+        .{ .choices = &[_][]const u8{ "users", "groups", "logs" } },
+        input_stream.reader(),
+        output_stream.writer(),
+    );
+    _ = decision;
+}
+
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -313,6 +391,12 @@ pub fn main() !void {
     try results.append(allocator, try runBenchmark("Expect Validation", allocator, benchmarkExpectValidation, "Advanced Features"));
     try results.append(allocator, try runBenchmark("Declarative Structs", allocator, benchmarkStructParsing, "Advanced Features"));
 
+    // Workflow Helpers
+    try results.append(allocator, try runBenchmark("Negated Flags", allocator, benchmarkNegatedFlags, "Workflow Helpers"));
+    try results.append(allocator, try runBenchmark("Select/All Helpers", allocator, benchmarkSelectOrAllHelpers, "Workflow Helpers"));
+    try results.append(allocator, try runBenchmark("Include/Exclude Strict Resolve", allocator, benchmarkIncludeExcludeStrict, "Workflow Helpers"));
+    try results.append(allocator, try runBenchmark("Prompt Resolution (Parsed)", allocator, benchmarkPromptResolutionParsed, "Workflow Helpers"));
+
     // Validation
     try results.append(allocator, try runBenchmark("File Extension Validation", allocator, benchmarkFileExtensionValidation, "Validation"));
     try results.append(allocator, try runBenchmark("File Name Policy Validation", allocator, benchmarkFileNamePolicyValidation, "Validation"));
@@ -320,6 +404,7 @@ pub fn main() !void {
     // Generation
     try results.append(allocator, try runBenchmark("Help Text Generation", allocator, benchmarkHelpGeneration, "Generation"));
     try results.append(allocator, try runBenchmark("Shell Completion Generation (Bash)", allocator, benchmarkCompletionGeneration, "Generation"));
+    try results.append(allocator, try runBenchmark("Shell Completion Generation (Zsh)", allocator, benchmarkCompletionGenerationZsh, "Generation"));
 
     // Print all results to console
     printResults(results.items);
