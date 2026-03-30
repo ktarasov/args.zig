@@ -328,6 +328,28 @@ Run it with:
 zig build run-file_support
 ```
 
+## Data Input Validation Example
+
+`examples/data_input_validation.zig` demonstrates typed input validator helpers:
+
+- `addEmailOption`
+- `addUrlOption`
+- `addIpv4Option`
+- `addHostNameOption`
+- `addPortOption`
+- `addUuidOption`
+- `addIsoDateOption` and `addIsoDateTimeOption`
+- `addYearOption` and `addTimeOption`
+- `addAbsolutePathOption`
+- `addJsonOption`
+- Numeric range validation via `Validators.intRange(...)`
+
+Run it with:
+
+```bash
+zig build run-data_input_validation
+```
+
 ## Counters and Choices Example
 
 Using counters for verbosity and choices for validation:

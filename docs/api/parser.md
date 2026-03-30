@@ -202,6 +202,14 @@ pub fn addSelectOption(self: *ArgumentParser, options: struct {
 
 Adds an exclusive helper pair around `--select` and `--all`.
 
+### `addSelectCsvOption`
+
+Adds a CSV-oriented `--select` option for multi-target workflows.
+
+### `addSelectOrAllCsv`
+
+Adds an exclusive helper pair around `--select <csv-list>` and `--all`.
+
 ### `addIncludeOption`
 
 Adds a conventional `--include` option for comma-separated filters.
@@ -256,6 +264,25 @@ pub fn addFileNameOptionWithExtensions(
 
 Adds a file-name option constrained by allowed extensions.
 
+### Typed Input Helper Methods
+
+The parser includes one-call helpers for common input formats:
+
+- `addEmailOption`
+- `addUrlOption`
+- `addIpv4Option`
+- `addHostNameOption`
+- `addPortOption`
+- `addUuidOption`
+- `addIsoDateOption`
+- `addIsoDateTimeOption`
+- `addYearOption`
+- `addTimeOption`
+- `addJsonOption`
+- `addAbsolutePathOption`
+
+Each helper adds a `.string` option with an appropriate built-in validator.
+
 ### Validator Aliases (Top-Level)
 
 `args.zig` re-exports validation helpers for concise client-side usage:
@@ -287,6 +314,23 @@ pub const PromptSelectOrAllOptions = struct {
     max_suggestion_distance: usize = 3,
     max_attempts: usize = 3,
 };
+```
+
+### `SelectOrAllStrictOptions`
+
+Configuration for strict CSV select/all resolution with optional normalization and deduplication.
+
+### `resolveSelectOrAllStrict`
+
+Resolves parsed `--select` and `--all` values into a canonical selection result:
+
+```zig
+var resolved = try args.resolveSelectOrAllStrict(allocator, &parsed, .{
+    .choices = &[_][]const u8{ "users", "groups", "logs" },
+    .allow_prefix_match = true,
+    .dedupe = true,
+});
+defer resolved.deinit();
 ```
 
 ### `PromptSelectOrAllDecision`

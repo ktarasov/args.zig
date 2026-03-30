@@ -232,6 +232,36 @@ pub const ArgumentParser = struct {
         });
     }
 
+    fn addValidatedStringOption(self: *ArgumentParser, name: []const u8, validator_fn: validation.ValidatorFn, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = null,
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        expect: []const []const u8 = &.{},
+    }) !void {
+        try self.addOption(name, .{
+            .short = options.short,
+            .help = options.help,
+            .value_type = .string,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .validator = validator_fn,
+            .expect = options.expect,
+        });
+    }
+
     /// Adds a path option (`ValueType.path`) for files or directories.
     pub fn addPathOption(self: *ArgumentParser, name: []const u8, options: struct {
         short: ?u8 = null,
@@ -260,6 +290,38 @@ pub const ArgumentParser = struct {
             .aliases = options.aliases,
             .deprecated = options.deprecated,
             .validator = options.validator,
+            .expect = options.expect,
+        });
+    }
+
+    /// Adds a path option that enforces absolute-path input by default.
+    pub fn addAbsolutePathOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = "ABS_PATH",
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        validator: ?validation.ValidatorFn = null,
+        expect: []const []const u8 = &.{},
+    }) !void {
+        const validator_fn = options.validator orelse validation.Validators.absolutePath;
+        try self.addPathOption(name, .{
+            .short = options.short,
+            .help = options.help,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .validator = validator_fn,
             .expect = options.expect,
         });
     }
@@ -457,6 +519,347 @@ pub const ArgumentParser = struct {
         });
     }
 
+    /// Adds an email option with built-in email format validation.
+    pub fn addEmailOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = "EMAIL",
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        validator: ?validation.ValidatorFn = null,
+        expect: []const []const u8 = &.{},
+    }) !void {
+        const validator_fn = options.validator orelse validation.Validators.emailAddress;
+        try self.addValidatedStringOption(name, validator_fn, .{
+            .short = options.short,
+            .help = options.help,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .expect = options.expect,
+        });
+    }
+
+    /// Adds an HTTP/HTTPS URL option.
+    pub fn addUrlOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = "URL",
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        validator: ?validation.ValidatorFn = null,
+        expect: []const []const u8 = &.{},
+    }) !void {
+        const validator_fn = options.validator orelse validation.Validators.httpUrl;
+        try self.addValidatedStringOption(name, validator_fn, .{
+            .short = options.short,
+            .help = options.help,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .expect = options.expect,
+        });
+    }
+
+    /// Adds an IPv4 address option.
+    pub fn addIpv4Option(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = "IPV4",
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        validator: ?validation.ValidatorFn = null,
+        expect: []const []const u8 = &.{},
+    }) !void {
+        const validator_fn = options.validator orelse validation.Validators.ipv4;
+        try self.addValidatedStringOption(name, validator_fn, .{
+            .short = options.short,
+            .help = options.help,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .expect = options.expect,
+        });
+    }
+
+    /// Adds a hostname option.
+    pub fn addHostNameOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = "HOST",
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        validator: ?validation.ValidatorFn = null,
+        expect: []const []const u8 = &.{},
+    }) !void {
+        const validator_fn = options.validator orelse validation.Validators.hostname;
+        try self.addValidatedStringOption(name, validator_fn, .{
+            .short = options.short,
+            .help = options.help,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .expect = options.expect,
+        });
+    }
+
+    /// Adds a UUID option.
+    pub fn addUuidOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = "UUID",
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        validator: ?validation.ValidatorFn = null,
+        expect: []const []const u8 = &.{},
+    }) !void {
+        const validator_fn = options.validator orelse validation.Validators.uuid;
+        try self.addValidatedStringOption(name, validator_fn, .{
+            .short = options.short,
+            .help = options.help,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .expect = options.expect,
+        });
+    }
+
+    /// Adds an ISO date option (`YYYY-MM-DD`).
+    pub fn addIsoDateOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = "YYYY-MM-DD",
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        validator: ?validation.ValidatorFn = null,
+        expect: []const []const u8 = &.{},
+    }) !void {
+        const validator_fn = options.validator orelse validation.Validators.isoDate;
+        try self.addValidatedStringOption(name, validator_fn, .{
+            .short = options.short,
+            .help = options.help,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .expect = options.expect,
+        });
+    }
+
+    /// Adds an ISO date-time option (`YYYY-MM-DDTHH:MM:SS[Z]`).
+    pub fn addIsoDateTimeOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = "YYYY-MM-DDTHH:MM:SSZ",
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        validator: ?validation.ValidatorFn = null,
+        expect: []const []const u8 = &.{},
+    }) !void {
+        const validator_fn = options.validator orelse validation.Validators.isoDateTime;
+        try self.addValidatedStringOption(name, validator_fn, .{
+            .short = options.short,
+            .help = options.help,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .expect = options.expect,
+        });
+    }
+
+    /// Adds a JSON text option for validating structured payload input.
+    pub fn addJsonOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = "JSON",
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        validator: ?validation.ValidatorFn = null,
+        expect: []const []const u8 = &.{},
+    }) !void {
+        const validator_fn = options.validator orelse validation.Validators.json;
+        try self.addValidatedStringOption(name, validator_fn, .{
+            .short = options.short,
+            .help = options.help,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .expect = options.expect,
+        });
+    }
+
+    /// Adds a year option (`YYYY`).
+    pub fn addYearOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = "YYYY",
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        validator: ?validation.ValidatorFn = null,
+        expect: []const []const u8 = &.{},
+    }) !void {
+        const validator_fn = options.validator orelse validation.Validators.year;
+        try self.addValidatedStringOption(name, validator_fn, .{
+            .short = options.short,
+            .help = options.help,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .expect = options.expect,
+        });
+    }
+
+    /// Adds a 24-hour time option (`HH:MM` or `HH:MM:SS`).
+    pub fn addTimeOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = "HH:MM",
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        validator: ?validation.ValidatorFn = null,
+        expect: []const []const u8 = &.{},
+    }) !void {
+        const validator_fn = options.validator orelse validation.Validators.time;
+        try self.addValidatedStringOption(name, validator_fn, .{
+            .short = options.short,
+            .help = options.help,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .expect = options.expect,
+        });
+    }
+
+    /// Adds a port option (`1..65535`).
+    pub fn addPortOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = "PORT",
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        validator: ?validation.ValidatorFn = null,
+        expect: []const []const u8 = &.{},
+    }) !void {
+        const validator_fn = options.validator orelse validation.Validators.port;
+        try self.addValidatedStringOption(name, validator_fn, .{
+            .short = options.short,
+            .help = options.help,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .expect = options.expect,
+        });
+    }
+
     /// Adds a positional argument.
     pub fn addPositional(self: *ArgumentParser, name: []const u8, options: struct {
         help: ?[]const u8 = null,
@@ -559,6 +962,39 @@ pub const ArgumentParser = struct {
         });
     }
 
+    /// Adds a conventional CSV-based `--select` option for multi-target workflows.
+    pub fn addSelectCsvOption(self: *ArgumentParser, options: struct {
+        name: []const u8 = "select",
+        short: ?u8 = null,
+        help: ?[]const u8 = "Select specific items (comma-separated)",
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = "LIST",
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        validator: ?validation.ValidatorFn = validation.Validators.nonEmpty,
+        expect: []const []const u8 = &.{},
+    }) !void {
+        try self.addOption(options.name, .{
+            .short = options.short,
+            .help = options.help,
+            .value_type = .string,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .validator = options.validator,
+            .expect = options.expect,
+        });
+    }
+
     /// Adds an exclusive selection pair (`--select` vs `--all`) commonly used in CMD/CLI tools.
     pub fn addSelectOrAll(self: *ArgumentParser, options: struct {
         group_name: []const u8 = "Selection",
@@ -597,6 +1033,61 @@ pub const ArgumentParser = struct {
             .value_type = options.select_value_type,
             .default = options.select_default,
             .choices = options.select_choices,
+            .metavar = options.select_metavar,
+            .dest = options.select_dest,
+            .env_var = options.select_env_var,
+            .aliases = options.select_aliases,
+            .deprecated = options.select_deprecated,
+            .validator = options.select_validator,
+            .expect = options.select_expect,
+        });
+
+        try self.addAllFlag(.{
+            .name = options.all_name,
+            .short = options.all_short,
+            .help = options.all_help,
+            .dest = options.all_dest,
+            .aliases = options.all_aliases,
+            .deprecated = options.all_deprecated,
+        });
+
+        self.setGroup(null);
+    }
+
+    /// Adds a CSV-oriented exclusive pair (`--select users,groups` vs `--all`).
+    pub fn addSelectOrAllCsv(self: *ArgumentParser, options: struct {
+        group_name: []const u8 = "Selection",
+        group_description: ?[]const u8 = "Target selection options",
+        required: bool = false,
+        select_name: []const u8 = "select",
+        select_short: ?u8 = null,
+        select_help: ?[]const u8 = "Select specific items (comma-separated)",
+        select_default: ?[]const u8 = null,
+        select_metavar: ?[]const u8 = "LIST",
+        select_dest: ?[]const u8 = null,
+        select_env_var: ?[]const u8 = null,
+        select_aliases: []const []const u8 = &.{},
+        select_deprecated: ?[]const u8 = null,
+        select_validator: ?validation.ValidatorFn = validation.Validators.nonEmpty,
+        select_expect: []const []const u8 = &.{},
+        all_name: []const u8 = "all",
+        all_short: ?u8 = null,
+        all_help: ?[]const u8 = "Select all items",
+        all_dest: ?[]const u8 = null,
+        all_aliases: []const []const u8 = &.{},
+        all_deprecated: ?[]const u8 = null,
+    }) !void {
+        try self.addArgumentGroup(options.group_name, .{
+            .description = options.group_description,
+            .exclusive = true,
+            .required = options.required,
+        });
+
+        try self.addSelectCsvOption(.{
+            .name = options.select_name,
+            .short = options.select_short,
+            .help = options.select_help,
+            .default = options.select_default,
             .metavar = options.select_metavar,
             .dest = options.select_dest,
             .env_var = options.select_env_var,
@@ -1228,6 +1719,26 @@ pub const IncludeExcludeStrictResolved = struct {
     }
 };
 
+pub const SelectOrAllStrictOptions = struct {
+    select_key: []const u8 = "select",
+    all_key: []const u8 = "all",
+    choices: []const []const u8 = &.{},
+    case_sensitive: bool = false,
+    allow_prefix_match: bool = true,
+    dedupe: bool = true,
+    require_selection_when_not_all: bool = false,
+};
+
+pub const SelectOrAllStrictResolved = struct {
+    all: bool,
+    selected: [][]const u8,
+    allocator: std.mem.Allocator,
+
+    pub fn deinit(self: *SelectOrAllStrictResolved) void {
+        deinitCsvList(self.allocator, self.selected);
+    }
+};
+
 fn indexOfFilterValue(items: [][]const u8, value: []const u8, case_sensitive: bool) ?usize {
     for (items, 0..) |item, idx| {
         if (equalsWithCase(item, value, case_sensitive)) return idx;
@@ -1263,6 +1774,67 @@ fn normalizeFilterValue(raw_value: []const u8, options: IncludeExcludeStrictOpti
     }
 
     return error.InvalidChoice;
+}
+
+fn normalizeSelectedValue(raw_value: []const u8, options: SelectOrAllStrictOptions) ![]const u8 {
+    if (options.choices.len == 0) return raw_value;
+
+    if (pickChoiceByName(raw_value, options.choices, options.case_sensitive)) |matched| {
+        return matched;
+    }
+
+    if (options.allow_prefix_match) {
+        if (pickChoiceByUniquePrefix(raw_value, options.choices, options.case_sensitive)) |matched| {
+            return matched;
+        }
+    }
+
+    return error.InvalidChoice;
+}
+
+pub fn resolveSelectOrAllStrict(
+    allocator: std.mem.Allocator,
+    parsed: *const ParseResult,
+    options: SelectOrAllStrictOptions,
+) !SelectOrAllStrictResolved {
+    const all_enabled = parsed.getBool(options.all_key) orelse false;
+    if (all_enabled) {
+        return .{
+            .all = true,
+            .selected = try allocator.alloc([]const u8, 0),
+            .allocator = allocator,
+        };
+    }
+
+    const raw_select = parsed.getString(options.select_key) orelse "";
+    const items = try parseCsvList(allocator, raw_select);
+    defer deinitCsvList(allocator, items);
+
+    if (items.len == 0) {
+        if (options.require_selection_when_not_all) return error.MissingRequiredArgument;
+        return .{
+            .all = false,
+            .selected = try allocator.alloc([]const u8, 0),
+            .allocator = allocator,
+        };
+    }
+
+    var selected_out = std.ArrayListUnmanaged([]const u8).empty;
+    errdefer {
+        for (selected_out.items) |item| allocator.free(item);
+        selected_out.deinit(allocator);
+    }
+
+    for (items) |raw_item| {
+        const normalized = try normalizeSelectedValue(raw_item, options);
+        try appendFilterValue(allocator, &selected_out, normalized, options.case_sensitive, options.dedupe);
+    }
+
+    return .{
+        .all = false,
+        .selected = try selected_out.toOwnedSlice(allocator),
+        .allocator = allocator,
+    };
 }
 
 pub fn resolveIncludeExclude(
@@ -1962,6 +2534,91 @@ test "ArgumentParser addFileNameOptionWithExtensions validates extension" {
     }
 }
 
+test "ArgumentParser typed validation option helpers" {
+    const allocator = std.testing.allocator;
+
+    var ap = try ArgumentParser.init(allocator, .{
+        .name = "typed-inputs",
+        .config = Config.minimal(),
+    });
+    defer ap.deinit();
+
+    try ap.addEmailOption("email", .{});
+    try ap.addUrlOption("endpoint", .{});
+    try ap.addIpv4Option("host", .{});
+    try ap.addHostNameOption("hostname", .{});
+    try ap.addUuidOption("request-id", .{});
+    try ap.addIsoDateOption("date", .{});
+    try ap.addIsoDateTimeOption("timestamp", .{});
+    try ap.addYearOption("year", .{});
+    try ap.addTimeOption("time", .{});
+    try ap.addPortOption("port", .{});
+    try ap.addJsonOption("payload", .{});
+
+    const cwd_abs = try std.fs.cwd().realpathAlloc(allocator, ".");
+    defer allocator.free(cwd_abs);
+    try ap.addAbsolutePathOption("workspace", .{});
+
+    {
+        const argv = [_][]const u8{
+            "--email",      "user@example.com",
+            "--endpoint",   "https://api.example.com/v1",
+            "--host",       "10.0.0.8",
+            "--hostname",   "api.example.com",
+            "--request-id", "123e4567-e89b-12d3-a456-426614174000",
+            "--date",       "2026-03-30",
+            "--timestamp",  "2026-03-30T15:30:10Z",
+            "--year",       "2026",
+            "--time",       "15:30:10",
+            "--port",       "8080",
+            "--workspace",  cwd_abs,
+            "--payload",    "{\"ok\":true}",
+        };
+        var result = try ap.parse(&argv);
+        defer result.deinit();
+
+        try std.testing.expectEqualStrings("user@example.com", result.getString("email").?);
+        try std.testing.expectEqualStrings("https://api.example.com/v1", result.getString("endpoint").?);
+        try std.testing.expectEqualStrings("2026", result.getString("year").?);
+        try std.testing.expectEqualStrings("15:30:10", result.getString("time").?);
+    }
+
+    {
+        const argv = [_][]const u8{ "--email", "invalid" };
+        try std.testing.expectError(error.CustomValidationFailed, ap.parse(&argv));
+    }
+
+    {
+        const argv = [_][]const u8{ "--host", "10.0.0.999" };
+        try std.testing.expectError(error.CustomValidationFailed, ap.parse(&argv));
+    }
+
+    {
+        const argv = [_][]const u8{ "--hostname", "bad_host" };
+        try std.testing.expectError(error.CustomValidationFailed, ap.parse(&argv));
+    }
+
+    {
+        const argv = [_][]const u8{ "--year", "26" };
+        try std.testing.expectError(error.CustomValidationFailed, ap.parse(&argv));
+    }
+
+    {
+        const argv = [_][]const u8{ "--time", "25:00" };
+        try std.testing.expectError(error.CustomValidationFailed, ap.parse(&argv));
+    }
+
+    {
+        const argv = [_][]const u8{ "--workspace", "relative/path" };
+        try std.testing.expectError(error.CustomValidationFailed, ap.parse(&argv));
+    }
+
+    {
+        const argv = [_][]const u8{ "--port", "70000" };
+        try std.testing.expectError(error.CustomValidationFailed, ap.parse(&argv));
+    }
+}
+
 test "ArgumentParser addDeprecated" {
     const allocator = std.testing.allocator;
 
@@ -2031,6 +2688,58 @@ test "ArgumentParser addSelectOrAll exclusivity" {
     {
         const argv = [_][]const u8{ "--select", "users", "--all" };
         try std.testing.expectError(error.MutuallyExclusive, ap.parse(&argv));
+    }
+}
+
+test "ArgumentParser addSelectOrAllCsv and resolveSelectOrAllStrict" {
+    const allocator = std.testing.allocator;
+
+    var ap = try ArgumentParser.init(allocator, .{
+        .name = "cmd",
+        .config = Config.minimal(),
+    });
+    defer ap.deinit();
+
+    try ap.addSelectOrAllCsv(.{ .select_short = 's', .all_short = 'a' });
+
+    {
+        const argv = [_][]const u8{ "--select", "users,gr,users" };
+        var parsed = try ap.parse(&argv);
+        defer parsed.deinit();
+
+        var resolved = try resolveSelectOrAllStrict(allocator, &parsed, .{
+            .choices = &[_][]const u8{ "users", "groups", "logs" },
+            .allow_prefix_match = true,
+            .dedupe = true,
+        });
+        defer resolved.deinit();
+
+        try std.testing.expect(!resolved.all);
+        try std.testing.expectEqual(@as(usize, 2), resolved.selected.len);
+        try std.testing.expectEqualStrings("users", resolved.selected[0]);
+        try std.testing.expectEqualStrings("groups", resolved.selected[1]);
+    }
+
+    {
+        const argv = [_][]const u8{"--all"};
+        var parsed = try ap.parse(&argv);
+        defer parsed.deinit();
+
+        var resolved = try resolveSelectOrAllStrict(allocator, &parsed, .{});
+        defer resolved.deinit();
+
+        try std.testing.expect(resolved.all);
+        try std.testing.expectEqual(@as(usize, 0), resolved.selected.len);
+    }
+
+    {
+        const argv = [_][]const u8{ "--select", "unknown" };
+        var parsed = try ap.parse(&argv);
+        defer parsed.deinit();
+
+        try std.testing.expectError(error.InvalidChoice, resolveSelectOrAllStrict(allocator, &parsed, .{
+            .choices = &[_][]const u8{ "users", "groups", "logs" },
+        }));
     }
 }
 

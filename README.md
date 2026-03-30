@@ -56,6 +56,8 @@ A production-grade, high-performance command-line argument parsing library for Z
 - [**Include/Exclude Filters**](https://muhammad-fiaz.github.io/args.zig/guide/options-flags#includeexclude-filters) - Reusable `--include` and `--exclude` helpers for CMD workflows
 - [**Strict Filter Resolution**](https://muhammad-fiaz.github.io/args.zig/guide/options-flags#strict-includeexclude-resolution) - Canonicalize choices, dedupe values, and detect include/exclude conflicts
 - [**File & Extension Support**](https://muhammad-fiaz.github.io/args.zig/guide/options-flags#file-and-extension-support) - Reusable helpers for file paths, directories, and allowed extensions
+- [**Typed Input Validators**](https://muhammad-fiaz.github.io/args.zig/guide/validation#typed-input-validators) - Built-in validators for email, URL, IPv4, UUID, ISO dates, year/time, JSON payloads, and absolute paths
+- [**CSV Select/All Resolution**](https://muhammad-fiaz.github.io/args.zig/guide/options-flags#csv-selectall-strict-resolution) - Resolve `--select users,groups` and `--all` into normalized target sets
 - [**Well Tested**](CONTRIBUTING.md#running-tests) - Extensive test coverage across all modules
 
 
@@ -247,14 +249,47 @@ const color_enabled = result.getBool("color") orelse true; // false
 Use helpers to quickly model common command patterns:
 
 ```zig
-try parser.addSelectOrAll(.{
+try parser.addSelectOrAllCsv(.{
     .select_short = 's',
     .all_short = 'a',
-    .select_choices = &[_][]const u8{ "users", "groups" },
 });
 ```
 
-This creates an exclusive pair (`--select <value>` vs `--all`).
+This creates an exclusive pair (`--select <csv-list>` vs `--all`).
+
+Normalize selections into canonical values:
+
+```zig
+var resolved = try args.resolveSelectOrAllStrict(allocator, &result, .{
+    .choices = &[_][]const u8{ "users", "groups", "logs" },
+    .allow_prefix_match = true,
+    .dedupe = true,
+});
+defer resolved.deinit();
+```
+
+### Typed Input Validation Helpers
+
+Use dedicated helpers for common API/configuration inputs:
+
+```zig
+try parser.addEmailOption("email", .{});
+try parser.addUrlOption("endpoint", .{});
+try parser.addIpv4Option("host", .{});
+try parser.addHostNameOption("hostname", .{});
+try parser.addPortOption("port", .{});
+try parser.addUuidOption("request-id", .{});
+try parser.addIsoDateOption("run-date", .{});
+try parser.addIsoDateTimeOption("timestamp", .{});
+try parser.addYearOption("year", .{});
+try parser.addTimeOption("time", .{});
+try parser.addAbsolutePathOption("workspace", .{});
+try parser.addJsonOption("payload", .{});
+
+try parser.addOption("retries", .{
+    .validator = args.Validators.intRange(1, 10),
+});
+```
 
 ### Question-Based Selection Flow
 
@@ -476,6 +511,7 @@ zig build run-question_flow
 zig build run-include_exclude
 zig build run-include_exclude_strict
 zig build run-file_support
+zig build run-data_input_validation
 
 # Run benchmarks
 zig build bench
@@ -508,6 +544,7 @@ Typical results on modern hardware (10,000 iterations):
 | Callbacks                       | ~23 μs    | ~42,400 ops/sec  |
 | Negated Flags                   | ~22 μs    | ~45,000 ops/sec  |
 | Select/All Helpers              | ~25 μs    | ~39,500 ops/sec  |
+| Select/All CSV Strict Resolve   | ~53 μs    | ~18,800 ops/sec  |
 | Include/Exclude Strict Resolve  | ~31 μs    | ~31,800 ops/sec  |
 | Prompt Resolution (Parsed)      | ~24 μs    | ~41,600 ops/sec  |
 | Help Text Generation            | ~46 μs    | ~21,500 ops/sec  |
@@ -517,6 +554,7 @@ Typical results on modern hardware (10,000 iterations):
 | Expect Validation               | ~18 μs    | ~56,400 ops/sec  |
 | File Extension Validation       | ~21 μs    | ~47,100 ops/sec  |
 | File Name Policy Validation     | ~22 μs    | ~46,200 ops/sec  |
+| Typed Input Validation          | ~138 μs   | ~7,300 ops/sec   |
 
 
 > [!NOTE]

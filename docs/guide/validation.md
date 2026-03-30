@@ -91,6 +91,50 @@ args.zig includes reusable built-ins for common file workflows:
 - `Validators.fileNameWithExtensions(...)`
 - `Validators.fileNameLength(min, max)`
 
+## Typed Input Validators
+
+args.zig also provides reusable validators for common app and API inputs:
+
+- `Validators.emailAddress` / `Validators.email`
+- `Validators.httpUrl` / `Validators.url`
+- `Validators.ipv4` / `Validators.ip`
+- `Validators.hostname`
+- `Validators.port`
+- `Validators.uuid`
+- `Validators.isoDate` / `Validators.date`
+- `Validators.isoDateTime` / `Validators.dateTime`
+- `Validators.year`
+- `Validators.time`
+- `Validators.json`
+- `Validators.absolutePath`
+- `Validators.intRange(min, max)`
+- `Validators.floatRange(min, max)`
+
+You can use them directly:
+
+```zig
+try parser.addOption("email", .{ .validator = args.Validators.email });
+try parser.addOption("endpoint", .{ .validator = args.Validators.url });
+try parser.addOption("run-date", .{ .validator = args.Validators.date });
+```
+
+Or use high-level parser helpers:
+
+```zig
+try parser.addEmailOption("email", .{});
+try parser.addUrlOption("endpoint", .{});
+try parser.addIpv4Option("host", .{});
+try parser.addHostNameOption("hostname", .{});
+try parser.addPortOption("port", .{});
+try parser.addUuidOption("request-id", .{});
+try parser.addIsoDateOption("run-date", .{});
+try parser.addIsoDateTimeOption("timestamp", .{});
+try parser.addYearOption("year", .{});
+try parser.addTimeOption("time", .{});
+try parser.addAbsolutePathOption("workspace", .{});
+try parser.addJsonOption("payload", .{});
+```
+
 ## Validator Composition
 
 You can combine validators without duplicating logic:

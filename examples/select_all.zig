@@ -8,7 +8,7 @@ pub fn main() !void {
 
     var parser = try args.ArgumentParser.init(allocator, .{
         .name = "select-all",
-        .description = "CMD-style --select/--all feature demo",
+        .description = "CMD-style --select/--all CSV feature demo",
         .config = .{
             .exit_on_error = false,
             .check_for_updates = false,
@@ -17,28 +17,28 @@ pub fn main() !void {
     });
     defer parser.deinit();
 
-    try parser.addSelectOrAll(.{
+    try parser.addSelectOrAllCsv(.{
         .select_short = 's',
         .all_short = 'a',
-        .select_choices = &[_][]const u8{ "users", "groups", "logs" },
-        .select_help = "Select one target type",
+        .select_help = "Select one or more target types",
         .all_help = "Select all target types",
     });
 
-    const argv = [_][]const u8{ "--select", "users" };
+    const argv = [_][]const u8{ "--select", "users,gr,users" };
     var result = try parser.parse(&argv);
     defer result.deinit();
 
-    const all_enabled = result.getBool("all") orelse false;
-    const selected = result.getString("select") orelse "<none>";
+    var resolved = try args.resolveSelectOrAllStrict(allocator, &result, .{
+        .choices = &[_][]const u8{ "users", "groups", "logs" },
+        .allow_prefix_match = true,
+        .dedupe = true,
+    });
+    defer resolved.deinit();
 
-    const selected_items = try args.parseCsvList(allocator, selected);
-    defer args.deinitCsvList(allocator, selected_items);
-
-    std.debug.print("all: {}\n", .{all_enabled});
-    std.debug.print("select raw: {s}\n", .{selected});
+    std.debug.print("all: {}\n", .{resolved.all});
+    std.debug.print("select raw: {s}\n", .{result.getString("select") orelse "<none>"});
     std.debug.print("select parsed:\n", .{});
-    for (selected_items) |item| {
+    for (resolved.selected) |item| {
         std.debug.print("  - {s}\n", .{item});
     }
 }

@@ -25,6 +25,7 @@ pub fn build(b: *std.Build) void {
         .{ .name = "include_exclude", .path = "examples/include_exclude.zig" },
         .{ .name = "include_exclude_strict", .path = "examples/include_exclude_strict.zig" },
         .{ .name = "file_support", .path = "examples/file_support.zig" },
+        .{ .name = "data_input_validation", .path = "examples/data_input_validation.zig" },
         .{ .name = "custom_parsing", .path = "examples/custom_parsing.zig" },
         .{ .name = "callbacks", .path = "examples/callbacks.zig" },
         .{ .name = "key_value", .path = "examples/key_value.zig" },

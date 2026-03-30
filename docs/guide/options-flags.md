@@ -114,6 +114,33 @@ myapp --all
 
 The pair is mutually exclusive by default.
 
+## CSV Select/All Strict Resolution
+
+For CMD-style, GUI, or TUI flows where one option can target multiple items, use CSV select/all helpers:
+
+```zig
+try parser.addSelectOrAllCsv(.{
+    .select_short = 's',
+    .all_short = 'a',
+});
+
+var parsed = try parser.parseProcess();
+defer parsed.deinit();
+
+var resolved = try args.resolveSelectOrAllStrict(allocator, &parsed, .{
+    .choices = &[_][]const u8{ "users", "groups", "logs" },
+    .allow_prefix_match = true,
+    .dedupe = true,
+});
+defer resolved.deinit();
+```
+
+Behavior summary:
+
+- `--all` returns `resolved.all = true` with an empty selected list.
+- `--select users,gr,users` can normalize to `users,groups` with dedupe.
+- Invalid items return `error.InvalidChoice` when `choices` are provided.
+
 ## Question-Based Selection Flow
 
 When users do not pass `--select` or `--all`, you can ask them interactively:
@@ -203,11 +230,26 @@ try parser.addDirectoryOption("workspace", .{
 Available helpers:
 
 - `addPathOption` for generic path values.
+- `addAbsolutePathOption` to enforce absolute path values.
 - `addFileOption` for file-oriented options.
 - `addDirectoryOption` for directory-oriented options.
 - `addFileOptionWithExtensions` for extension checks with reusable validator logic.
 - `addFileNameOption` for safe file-name-only values.
 - `addFileNameOptionWithExtensions` for file-name plus extension checks.
+
+Typed input helpers are also available for common API/configuration flows:
+
+- `addEmailOption`
+- `addUrlOption`
+- `addIpv4Option`
+- `addHostNameOption`
+- `addPortOption`
+- `addUuidOption`
+- `addIsoDateOption`
+- `addIsoDateTimeOption`
+- `addYearOption`
+- `addTimeOption`
+- `addJsonOption`
 
 Use a one-call policy validator for the common case:
 

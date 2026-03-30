@@ -56,6 +56,11 @@ pub fn validatePathExists(path: []const u8) bool {
     return true;
 }
 
+/// Check if a path is absolute for the current platform path rules.
+pub fn validateAbsolutePath(path: []const u8) bool {
+    return std.fs.path.isAbsolute(path);
+}
+
 /// Check if a path exists and is a regular file.
 pub fn validateFileExists(path: []const u8) bool {
     const stat = std.fs.cwd().statFile(path) catch return false;
@@ -110,6 +115,220 @@ pub fn validateFileName(file_name: []const u8) bool {
     if (last == '.' or last == ' ') return false;
 
     return true;
+}
+
+/// Basic email format validation for common CLI input checks.
+pub fn validateEmailAddress(value: []const u8) bool {
+    const at_index = std.mem.indexOfScalar(u8, value, '@') orelse return false;
+    if (at_index == 0 or at_index + 1 >= value.len) return false;
+    if (std.mem.lastIndexOfScalar(u8, value, '@') != at_index) return false;
+
+    const local = value[0..at_index];
+    const domain = value[at_index + 1 ..];
+
+    for (local) |c| {
+        if (std.ascii.isAlphanumeric(c)) continue;
+        if (c == '.' or c == '_' or c == '%' or c == '+' or c == '-') continue;
+        return false;
+    }
+
+    var has_dot = false;
+    for (domain) |c| {
+        if (std.ascii.isAlphanumeric(c)) continue;
+        if (c == '.') {
+            has_dot = true;
+            continue;
+        }
+        if (c == '-') continue;
+        return false;
+    }
+
+    if (!has_dot) return false;
+    if (domain[0] == '.' or domain[domain.len - 1] == '.') return false;
+    return true;
+}
+
+/// Validates `http://` and `https://` URL inputs for command-line options.
+pub fn validateHttpUrl(value: []const u8) bool {
+    const http_prefix = "http://";
+    const https_prefix = "https://";
+
+    const rest = if (std.ascii.startsWithIgnoreCase(value, http_prefix))
+        value[http_prefix.len..]
+    else if (std.ascii.startsWithIgnoreCase(value, https_prefix))
+        value[https_prefix.len..]
+    else
+        return false;
+
+    if (rest.len == 0) return false;
+
+    const separator_index = std.mem.indexOfAny(u8, rest, "/?#") orelse rest.len;
+    const host = rest[0..separator_index];
+    if (host.len == 0) return false;
+
+    for (host) |c| {
+        if (std.ascii.isAlphanumeric(c)) continue;
+        if (c == '.' or c == '-' or c == ':' or c == '[' or c == ']') continue;
+        return false;
+    }
+
+    return true;
+}
+
+/// Validates dotted IPv4 address strings (e.g. `192.168.1.10`).
+pub fn validateIPv4Address(value: []const u8) bool {
+    var it = std.mem.splitScalar(u8, value, '.');
+    var count: usize = 0;
+
+    while (it.next()) |part| {
+        if (part.len == 0) return false;
+        var number: u16 = 0;
+
+        for (part) |c| {
+            if (!std.ascii.isDigit(c)) return false;
+            number = number * 10 + (c - '0');
+            if (number > 255) return false;
+        }
+
+        count += 1;
+    }
+
+    return count == 4;
+}
+
+/// Validates canonical UUID strings (`xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`).
+pub fn validateUuid(value: []const u8) bool {
+    if (value.len != 36) return false;
+
+    for (value, 0..) |c, idx| {
+        if (idx == 8 or idx == 13 or idx == 18 or idx == 23) {
+            if (c != '-') return false;
+            continue;
+        }
+
+        if (!std.ascii.isHex(c)) return false;
+    }
+
+    return true;
+}
+
+fn isLeapYear(year: i32) bool {
+    if (@mod(year, 400) == 0) return true;
+    if (@mod(year, 100) == 0) return false;
+    return @mod(year, 4) == 0;
+}
+
+/// Validates `YYYY-MM-DD` format dates.
+pub fn validateIsoDate(value: []const u8) bool {
+    if (value.len != 10) return false;
+    if (value[4] != '-' or value[7] != '-') return false;
+
+    const year = std.fmt.parseInt(i32, value[0..4], 10) catch return false;
+    const month = std.fmt.parseInt(u8, value[5..7], 10) catch return false;
+    const day = std.fmt.parseInt(u8, value[8..10], 10) catch return false;
+
+    if (month < 1 or month > 12) return false;
+    if (day < 1) return false;
+
+    const max_day: u8 = switch (month) {
+        1, 3, 5, 7, 8, 10, 12 => 31,
+        4, 6, 9, 11 => 30,
+        2 => if (isLeapYear(year)) 29 else 28,
+        else => return false,
+    };
+
+    return day <= max_day;
+}
+
+/// Validates `YYYY-MM-DDTHH:MM:SS` or `YYYY-MM-DDTHH:MM:SSZ` timestamps.
+pub fn validateIsoDateTime(value: []const u8) bool {
+    const has_z = value.len == 20 and value[value.len - 1] == 'Z';
+    if (!(value.len == 19 or has_z)) return false;
+
+    const base = if (has_z) value[0 .. value.len - 1] else value;
+
+    if (base[10] != 'T') return false;
+    if (!validateIsoDate(base[0..10])) return false;
+    if (base[13] != ':' or base[16] != ':') return false;
+
+    const hour = std.fmt.parseInt(u8, base[11..13], 10) catch return false;
+    const minute = std.fmt.parseInt(u8, base[14..16], 10) catch return false;
+    const second = std.fmt.parseInt(u8, base[17..19], 10) catch return false;
+
+    return hour <= 23 and minute <= 59 and second <= 59;
+}
+
+/// Validates that a string is valid JSON text.
+pub fn validateJsonValue(value: []const u8) bool {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+
+    const parsed = std.json.parseFromSlice(std.json.Value, arena.allocator(), value, .{}) catch return false;
+    _ = parsed;
+    return true;
+}
+
+/// Validates a four-digit year string (`YYYY`).
+pub fn validateYear(value: []const u8) bool {
+    if (value.len != 4) return false;
+    for (value) |c| {
+        if (!std.ascii.isDigit(c)) return false;
+    }
+    _ = std.fmt.parseInt(u16, value, 10) catch return false;
+    return true;
+}
+
+/// Validates time in 24-hour format: `HH:MM` or `HH:MM:SS`.
+pub fn validateTime24(value: []const u8) bool {
+    if (!(value.len == 5 or value.len == 8)) return false;
+    if (value[2] != ':') return false;
+
+    const hour = std.fmt.parseInt(u8, value[0..2], 10) catch return false;
+    const minute = std.fmt.parseInt(u8, value[3..5], 10) catch return false;
+
+    if (hour > 23 or minute > 59) return false;
+
+    if (value.len == 8) {
+        if (value[5] != ':') return false;
+        const second = std.fmt.parseInt(u8, value[6..8], 10) catch return false;
+        if (second > 59) return false;
+    }
+
+    return true;
+}
+
+/// Validates hostnames using common DNS label constraints.
+pub fn validateHostName(value: []const u8) bool {
+    if (value.len == 0 or value.len > 253) return false;
+
+    var label_start: usize = 0;
+    var idx: usize = 0;
+    while (idx <= value.len) : (idx += 1) {
+        const is_end = idx == value.len or value[idx] == '.';
+        if (!is_end) continue;
+
+        const label = value[label_start..idx];
+        if (label.len == 0 or label.len > 63) return false;
+
+        const first = label[0];
+        const last = label[label.len - 1];
+        if (!std.ascii.isAlphanumeric(first) or !std.ascii.isAlphanumeric(last)) return false;
+
+        for (label) |c| {
+            if (std.ascii.isAlphanumeric(c) or c == '-') continue;
+            return false;
+        }
+
+        label_start = idx + 1;
+    }
+
+    return true;
+}
+
+/// Validates port number strings in range 1..65535.
+pub fn validatePort(value: []const u8) bool {
+    const parsed = std.fmt.parseInt(u16, value, 10) catch return false;
+    return parsed >= 1;
 }
 
 fn ensureAllowedExtension(value: []const u8, allowed_extensions: []const []const u8, case_sensitive: bool) ValidationResult {
@@ -177,8 +396,84 @@ pub const Validators = struct {
         return .{ .ok = {} };
     }
 
+    pub fn emailAddress(value: []const u8) ValidationResult {
+        return if (validateEmailAddress(value)) .{ .ok = {} } else .{ .err = "invalid email address" };
+    }
+
+    pub fn httpUrl(value: []const u8) ValidationResult {
+        return if (validateHttpUrl(value)) .{ .ok = {} } else .{ .err = "invalid URL (expected http/https)" };
+    }
+
+    pub fn ipv4(value: []const u8) ValidationResult {
+        return if (validateIPv4Address(value)) .{ .ok = {} } else .{ .err = "invalid IPv4 address" };
+    }
+
+    pub fn uuid(value: []const u8) ValidationResult {
+        return if (validateUuid(value)) .{ .ok = {} } else .{ .err = "invalid UUID" };
+    }
+
+    pub fn isoDate(value: []const u8) ValidationResult {
+        return if (validateIsoDate(value)) .{ .ok = {} } else .{ .err = "invalid date (expected YYYY-MM-DD)" };
+    }
+
+    pub fn isoDateTime(value: []const u8) ValidationResult {
+        return if (validateIsoDateTime(value)) .{ .ok = {} } else .{ .err = "invalid date-time (expected YYYY-MM-DDTHH:MM:SS[Z])" };
+    }
+
+    pub fn json(value: []const u8) ValidationResult {
+        return if (validateJsonValue(value)) .{ .ok = {} } else .{ .err = "invalid JSON" };
+    }
+
+    pub fn year(value: []const u8) ValidationResult {
+        return if (validateYear(value)) .{ .ok = {} } else .{ .err = "invalid year (expected YYYY)" };
+    }
+
+    pub fn time(value: []const u8) ValidationResult {
+        return if (validateTime24(value)) .{ .ok = {} } else .{ .err = "invalid time (expected HH:MM or HH:MM:SS)" };
+    }
+
+    pub fn hostname(value: []const u8) ValidationResult {
+        return if (validateHostName(value)) .{ .ok = {} } else .{ .err = "invalid hostname" };
+    }
+
+    pub fn port(value: []const u8) ValidationResult {
+        return if (validatePort(value)) .{ .ok = {} } else .{ .err = "invalid port (expected 1..65535)" };
+    }
+
+    pub fn intRange(comptime min: ?i64, comptime max: ?i64) ValidatorFn {
+        return struct {
+            fn validate(value: []const u8) ValidationResult {
+                _ = parseIntInRange(i64, value, min, max) catch |err| {
+                    return switch (err) {
+                        error.InvalidValue => .{ .err = "invalid integer" },
+                        error.OutOfRange => .{ .err = "integer is out of range" },
+                    };
+                };
+                return .{ .ok = {} };
+            }
+        }.validate;
+    }
+
+    pub fn floatRange(comptime min: ?f64, comptime max: ?f64) ValidatorFn {
+        return struct {
+            fn validate(value: []const u8) ValidationResult {
+                _ = parseFloatInRange(value, min, max) catch |err| {
+                    return switch (err) {
+                        error.InvalidValue => .{ .err = "invalid float" },
+                        error.OutOfRange => .{ .err = "float is out of range" },
+                    };
+                };
+                return .{ .ok = {} };
+            }
+        }.validate;
+    }
+
     pub fn pathExists(value: []const u8) ValidationResult {
         return if (validatePathExists(value)) .{ .ok = {} } else .{ .err = "path does not exist" };
+    }
+
+    pub fn absolutePath(value: []const u8) ValidationResult {
+        return if (validateAbsolutePath(value)) .{ .ok = {} } else .{ .err = "path must be absolute" };
     }
 
     pub fn fileExists(value: []const u8) ValidationResult {
@@ -294,6 +589,11 @@ pub const Validators = struct {
     }
 
     pub const fileName = fileNameSafe;
+    pub const email = emailAddress;
+    pub const url = httpUrl;
+    pub const ip = ipv4;
+    pub const date = isoDate;
+    pub const dateTime = isoDateTime;
     pub const ext = extension;
     pub const fileExt = fileNameWithExtensions;
     pub const filePolicy = fileNamePolicy;
@@ -437,4 +737,66 @@ test "Validators.fileNamePolicy" {
     try std.testing.expect(!validator("result.txt").isOk());
     try std.testing.expect(!validator("ab.json").isOk());
     try std.testing.expect(!validator("bad/name.json").isOk());
+}
+
+test "email, URL, IP, UUID validators" {
+    try std.testing.expect(validateEmailAddress("user@example.com"));
+    try std.testing.expect(!validateEmailAddress("user@example"));
+
+    try std.testing.expect(validateHttpUrl("https://example.com/path"));
+    try std.testing.expect(!validateHttpUrl("ftp://example.com"));
+
+    try std.testing.expect(validateIPv4Address("192.168.1.10"));
+    try std.testing.expect(!validateIPv4Address("256.1.1.1"));
+
+    try std.testing.expect(validateUuid("123e4567-e89b-12d3-a456-426614174000"));
+    try std.testing.expect(!validateUuid("not-a-uuid"));
+}
+
+test "date and JSON validators" {
+    try std.testing.expect(validateIsoDate("2026-03-30"));
+    try std.testing.expect(!validateIsoDate("2026-02-30"));
+
+    try std.testing.expect(validateIsoDateTime("2026-03-30T14:25:59"));
+    try std.testing.expect(validateIsoDateTime("2026-03-30T14:25:59Z"));
+    try std.testing.expect(!validateIsoDateTime("2026/03/30 14:25:59"));
+
+    try std.testing.expect(validateJsonValue("{\"ok\":true}"));
+    try std.testing.expect(!validateJsonValue("{not-json}"));
+}
+
+test "absolute path, year, and time validators" {
+    try std.testing.expect(!validateAbsolutePath("relative/path"));
+
+    try std.testing.expect(validateYear("2026"));
+    try std.testing.expect(!validateYear("26"));
+    try std.testing.expect(!validateYear("20ab"));
+
+    try std.testing.expect(validateTime24("14:30"));
+    try std.testing.expect(validateTime24("14:30:59"));
+    try std.testing.expect(!validateTime24("24:00"));
+    try std.testing.expect(!validateTime24("14:61"));
+}
+
+test "hostname and port validators" {
+    try std.testing.expect(validateHostName("api.example.com"));
+    try std.testing.expect(validateHostName("localhost"));
+    try std.testing.expect(!validateHostName("-bad-host"));
+    try std.testing.expect(!validateHostName("bad_host"));
+
+    try std.testing.expect(validatePort("8080"));
+    try std.testing.expect(!validatePort("0"));
+    try std.testing.expect(!validatePort("70000"));
+}
+
+test "Validators intRange and floatRange" {
+    const int_validator = Validators.intRange(1, 10);
+    try std.testing.expect(int_validator("5").isOk());
+    try std.testing.expect(!int_validator("0").isOk());
+    try std.testing.expect(!int_validator("abc").isOk());
+
+    const float_validator = Validators.floatRange(0.1, 1.0);
+    try std.testing.expect(float_validator("0.5").isOk());
+    try std.testing.expect(!float_validator("2.0").isOk());
+    try std.testing.expect(!float_validator("bad").isOk());
 }

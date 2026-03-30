@@ -287,6 +287,63 @@ fn benchmarkFileNamePolicyValidation(allocator: std.mem.Allocator) !void {
     try parseAndCleanup(&parser, &test_args);
 }
 
+fn benchmarkTypedInputValidation(allocator: std.mem.Allocator) !void {
+    const cwd_abs = try std.fs.cwd().realpathAlloc(allocator, ".");
+    defer allocator.free(cwd_abs);
+
+    const test_args = [_][]const u8{
+        "--email",      "ops@example.com",
+        "--endpoint",   "https://api.example.com/v1",
+        "--host",       "10.0.0.8",
+        "--hostname",   "api.example.com",
+        "--request-id", "123e4567-e89b-12d3-a456-426614174000",
+        "--run-date",   "2026-03-30",
+        "--timestamp",  "2026-03-30T15:30:10Z",
+        "--year",       "2026",
+        "--time",       "15:30:10",
+        "--port",       "8080",
+        "--workspace",  cwd_abs,
+        "--payload",    "{\"ok\":true}",
+    };
+
+    var parser = try initBenchParser(allocator, "bench");
+    defer parser.deinit();
+
+    try parser.addEmailOption("email", .{});
+    try parser.addUrlOption("endpoint", .{});
+    try parser.addIpv4Option("host", .{});
+    try parser.addHostNameOption("hostname", .{});
+    try parser.addUuidOption("request-id", .{});
+    try parser.addIsoDateOption("run-date", .{});
+    try parser.addIsoDateTimeOption("timestamp", .{});
+    try parser.addYearOption("year", .{});
+    try parser.addTimeOption("time", .{});
+    try parser.addPortOption("port", .{});
+    try parser.addAbsolutePathOption("workspace", .{});
+    try parser.addJsonOption("payload", .{});
+
+    try parseAndCleanup(&parser, &test_args);
+}
+
+fn benchmarkSelectOrAllStrictCsv(allocator: std.mem.Allocator) !void {
+    const test_args = [_][]const u8{ "--select", "users,gr,users" };
+
+    var parser = try initBenchParser(allocator, "bench");
+    defer parser.deinit();
+
+    try parser.addSelectOrAllCsv(.{});
+
+    var parsed = try parser.parse(&test_args);
+    defer parsed.deinit();
+
+    var resolved = try args.resolveSelectOrAllStrict(allocator, &parsed, .{
+        .choices = &[_][]const u8{ "users", "groups", "logs" },
+        .allow_prefix_match = true,
+        .dedupe = true,
+    });
+    defer resolved.deinit();
+}
+
 fn benchmarkStructParsing(allocator: std.mem.Allocator) !void {
     const Config = struct {
         verbose: bool,
@@ -394,12 +451,14 @@ pub fn main() !void {
     // Workflow Helpers
     try results.append(allocator, try runBenchmark("Negated Flags", allocator, benchmarkNegatedFlags, "Workflow Helpers"));
     try results.append(allocator, try runBenchmark("Select/All Helpers", allocator, benchmarkSelectOrAllHelpers, "Workflow Helpers"));
+    try results.append(allocator, try runBenchmark("Select/All CSV Strict Resolve", allocator, benchmarkSelectOrAllStrictCsv, "Workflow Helpers"));
     try results.append(allocator, try runBenchmark("Include/Exclude Strict Resolve", allocator, benchmarkIncludeExcludeStrict, "Workflow Helpers"));
     try results.append(allocator, try runBenchmark("Prompt Resolution (Parsed)", allocator, benchmarkPromptResolutionParsed, "Workflow Helpers"));
 
     // Validation
     try results.append(allocator, try runBenchmark("File Extension Validation", allocator, benchmarkFileExtensionValidation, "Validation"));
     try results.append(allocator, try runBenchmark("File Name Policy Validation", allocator, benchmarkFileNamePolicyValidation, "Validation"));
+    try results.append(allocator, try runBenchmark("Typed Input Validation", allocator, benchmarkTypedInputValidation, "Validation"));
 
     // Generation
     try results.append(allocator, try runBenchmark("Help Text Generation", allocator, benchmarkHelpGeneration, "Generation"));
