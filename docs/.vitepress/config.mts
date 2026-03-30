@@ -344,7 +344,7 @@ gtag('config', '${GA_ID}');`,
 
     footer: {
       message: "Released under the MIT License.",
-      copyright: "Copyright © 2025 Muhammad Fiaz",
+      copyright: "Copyright © 2025-Present Muhammad Fiaz",
     },
 
     search: {

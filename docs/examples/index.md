@@ -388,6 +388,44 @@ Run it with:
 zig build run-network_endpoints
 ```
 
+## Error Handling Example
+
+`examples/error_handling.zig` demonstrates practical parse error handling:
+
+- Duplicate singleton options (`DuplicateArgument`)
+- Validator failures (`CustomValidationFailed`)
+- Unknown option guidance and suggestion behavior
+- Option-level custom hints (`suggestion_hint`) and custom messages (`custom_error_message`)
+
+Run it with:
+
+```bash
+zig build run-error_handling
+```
+
+## Subcommand Suggestions Example
+
+`examples/subcommand_suggestions.zig` demonstrates built-in closest-match behavior for unknown subcommands and custom unknown-subcommand hints.
+
+Run it with:
+
+```bash
+zig build run-subcommand_suggestions
+```
+
+## Decryption Options Example
+
+`examples/decryption_options.zig` demonstrates automatic Base64 decoding/decryption behavior for options:
+
+- `addDecryptionOption("secret", .{})` for standard Base64 input
+- `addDecryptionOption("session", .{ .url_safe = true })` for URL-safe Base64 input
+
+Run it with:
+
+```bash
+zig build run-decryption_options
+```
+
 ## Counters and Choices Example
 
 Using counters for verbosity and choices for validation:

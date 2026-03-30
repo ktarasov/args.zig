@@ -159,6 +159,23 @@ Every typed helper accepts the same practical option fields used by `addOption` 
 - `.aliases` for alternate long names
 - `.validator` to override the default built-in validator
 
+### Decryption / Decoding Options
+
+For secrets or encoded payloads, args.zig can decode values before validation and storage.
+
+- `addDecryptionOption(...)` decodes Base64 input into plain text.
+- `.url_safe = true` switches to URL-safe Base64 decoding.
+- `addOption(..., .{ .decode_mode = ... })` and `addPositional(..., .{ .decode_mode = ... })` provide low-level control.
+
+```zig
+try parser.addDecryptionOption("secret", .{ .required = true });
+try parser.addDecryptionOption("session", .{ .url_safe = true });
+
+try parser.addOption("payload", .{
+    .decode_mode = .base64_std,
+});
+```
+
 ```zig
 try parser.addEmailOption("email", .{
     .short = 'e',

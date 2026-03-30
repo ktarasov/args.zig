@@ -529,6 +529,9 @@ zig build
 # Run tests
 zig build test
 
+# Run all examples in one go
+zig build run-all-examples
+
 # Run examples
 zig build run-basic
 zig build run-advanced
@@ -542,6 +545,9 @@ zig build run-include_exclude_strict
 zig build run-file_support
 zig build run-data_input_validation
 zig build run-network_endpoints
+zig build run-error_handling
+zig build run-subcommand_suggestions
+zig build run-decryption_options
 zig build run-update_check
 
 # Run benchmarks
@@ -550,6 +556,27 @@ zig build bench
 # Format code
 zig build fmt
 ```
+
+### Cross-Platform Validation
+
+Use the following commands to validate target coverage:
+
+```bash
+# Native target tests (runs tests)
+zig build test
+
+# Cross-target compile validation (builds all artifacts for each target)
+zig build -Dtarget=x86_64-windows-gnu
+zig build -Dtarget=x86_64-linux-gnu
+zig build -Dtarget=aarch64-macos
+
+# Targeted test invocations (must run on matching host/runner)
+zig build test -Dtarget=x86_64-windows-gnu
+zig build test -Dtarget=x86_64-linux-gnu
+zig build test -Dtarget=aarch64-macos
+```
+
+On Windows hosts, Linux/macOS test binaries can be compiled but not executed directly. Run those test commands on Linux/macOS CI runners (or native machines) for full runtime verification.
 
 ## Benchmarks
 
@@ -578,6 +605,8 @@ Typical results on modern hardware (10,000 iterations):
 | Select/All CSV Strict Resolve   | ~53 μs    | ~18,800 ops/sec  |
 | Include/Exclude Strict Resolve  | ~31 μs    | ~31,800 ops/sec  |
 | Prompt Resolution (Parsed)      | ~24 μs    | ~41,600 ops/sec  |
+| Suggestion Lookup               | ~2 μs     | ~500,000 ops/sec |
+| Subcommand Suggestion Lookup    | ~2 μs     | ~500,000 ops/sec |
 | Help Text Generation            | ~46 μs    | ~21,500 ops/sec  |
 | Shell Completion Generation (Bash) | ~23 μs | ~43,300 ops/sec  |
 | Shell Completion Generation (Zsh)  | ~24 μs | ~41,900 ops/sec  |
@@ -586,6 +615,7 @@ Typical results on modern hardware (10,000 iterations):
 | File Extension Validation       | ~21 μs    | ~47,100 ops/sec  |
 | File Name Policy Validation     | ~22 μs    | ~46,200 ops/sec  |
 | Typed Input Validation          | ~138 μs   | ~7,300 ops/sec   |
+| Decryption Option (Base64)      | ~30 μs    | ~33,000 ops/sec  |
 
 
 > [!NOTE]

@@ -6,6 +6,36 @@ const utils = @import("utils.zig");
 
 pub const ValueType = types.ValueType;
 pub const ParsedValue = types.ParsedValue;
+pub const DecodeMode = types.DecodeMode;
+
+/// Decoded value wrapper with optional owned buffer.
+pub const DecodedValue = struct {
+    value: []const u8,
+    owned: ?[]u8 = null,
+
+    pub fn deinit(self: *const DecodedValue, allocator: std.mem.Allocator) void {
+        if (self.owned) |buf| allocator.free(buf);
+    }
+};
+
+/// Decode a value according to the requested decode mode.
+/// For `.none`, the original slice is returned with no allocation.
+pub fn decodeValueForMode(allocator: std.mem.Allocator, raw: []const u8, mode: DecodeMode) !DecodedValue {
+    return switch (mode) {
+        .none => .{ .value = raw },
+        .base64_std => try decodeBase64(allocator, raw, false),
+        .base64_url_safe => try decodeBase64(allocator, raw, true),
+    };
+}
+
+fn decodeBase64(allocator: std.mem.Allocator, raw: []const u8, url_safe: bool) !DecodedValue {
+    const decoder = if (url_safe) std.base64.url_safe.Decoder else std.base64.standard.Decoder;
+    const decoded_len = decoder.calcSizeForSlice(raw) catch return error.InvalidValue;
+    const decoded = try allocator.alloc(u8, decoded_len);
+    errdefer allocator.free(decoded);
+    decoder.decode(decoded, raw) catch return error.InvalidValue;
+    return .{ .value = decoded, .owned = decoded };
+}
 
 /// Parse a string value into a typed ParsedValue.
 pub fn parseValue(value: []const u8, value_type: ValueType, allocator: std.mem.Allocator) !ParsedValue {

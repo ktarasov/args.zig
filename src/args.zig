@@ -23,6 +23,7 @@ pub const ParseResult = types.ParseResult;
 pub const ParsedValue = types.ParsedValue;
 pub const ValueType = types.ValueType;
 pub const ArgAction = types.ArgAction;
+pub const DecodeMode = types.DecodeMode;
 pub const Nargs = types.Nargs;
 pub const ParsingMode = types.ParsingMode;
 pub const ArgSpec = schema.ArgSpec;
@@ -211,6 +212,9 @@ pub const ArgumentParser = struct {
         deprecated: ?[]const u8 = null,
         validator: ?validation.ValidatorFn = null,
         expect: []const []const u8 = &.{},
+        suggestion_hint: ?[]const u8 = null,
+        custom_error_message: ?[]const u8 = null,
+        decode_mode: DecodeMode = .none,
     }) !void {
         try self.addArg(.{
             .name = name,
@@ -229,6 +233,9 @@ pub const ArgumentParser = struct {
             .deprecated = options.deprecated,
             .validator = options.validator,
             .expect = options.expect,
+            .suggestion_hint = options.suggestion_hint,
+            .custom_error_message = options.custom_error_message,
+            .decode_mode = options.decode_mode,
         });
     }
 
@@ -244,6 +251,8 @@ pub const ArgumentParser = struct {
         aliases: []const []const u8 = &.{},
         deprecated: ?[]const u8 = null,
         expect: []const []const u8 = &.{},
+        suggestion_hint: ?[]const u8 = null,
+        custom_error_message: ?[]const u8 = null,
     }) !void {
         try self.addOption(name, .{
             .short = options.short,
@@ -259,6 +268,8 @@ pub const ArgumentParser = struct {
             .deprecated = options.deprecated,
             .validator = validator_fn,
             .expect = options.expect,
+            .suggestion_hint = options.suggestion_hint,
+            .custom_error_message = options.custom_error_message,
         });
     }
 
@@ -1007,6 +1018,7 @@ pub const ArgumentParser = struct {
         expect: []const []const u8 = &.{},
         validator: ?validation.ValidatorFn = null,
         hidden: bool = false,
+        decode_mode: DecodeMode = .none,
     }) !void {
         try self.addArg(.{
             .name = name,
@@ -1021,6 +1033,45 @@ pub const ArgumentParser = struct {
             .expect = options.expect,
             .validator = options.validator,
             .hidden = options.hidden,
+            .decode_mode = options.decode_mode,
+        });
+    }
+
+    /// Adds an option whose input is transparently decoded from Base64 before validation and storage.
+    pub fn addDecryptionOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = "BASE64",
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        validator: ?validation.ValidatorFn = null,
+        expect: []const []const u8 = &.{},
+        suggestion_hint: ?[]const u8 = null,
+        custom_error_message: ?[]const u8 = null,
+        url_safe: bool = false,
+    }) !void {
+        try self.addOption(name, .{
+            .short = options.short,
+            .help = options.help,
+            .value_type = .string,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .validator = options.validator,
+            .expect = options.expect,
+            .suggestion_hint = options.suggestion_hint,
+            .custom_error_message = options.custom_error_message,
+            .decode_mode = if (options.url_safe) .base64_url_safe else .base64_std,
         });
     }
 
@@ -2895,6 +2946,42 @@ test "ArgumentParser addAllFlag and addSelectOption" {
         defer result.deinit();
         try std.testing.expectEqualStrings("users", result.getString("select").?);
     }
+}
+
+test "ArgumentParser addDecryptionOption decodes base64 input" {
+    const allocator = std.testing.allocator;
+
+    var ap = try ArgumentParser.init(allocator, .{
+        .name = "decrypt-test",
+        .config = Config.minimal(),
+    });
+    defer ap.deinit();
+
+    try ap.addDecryptionOption("token", .{});
+
+    const argv = [_][]const u8{ "--token", "c2VjcmV0LXRva2Vu" };
+    var result = try ap.parse(&argv);
+    defer result.deinit();
+
+    try std.testing.expectEqualStrings("secret-token", result.getString("token").?);
+}
+
+test "ArgumentParser positional supports decode_mode" {
+    const allocator = std.testing.allocator;
+
+    var ap = try ArgumentParser.init(allocator, .{
+        .name = "positional-decrypt-test",
+        .config = Config.minimal(),
+    });
+    defer ap.deinit();
+
+    try ap.addPositional("payload", .{ .decode_mode = .base64_std });
+
+    const argv = [_][]const u8{"aGVsbG8="};
+    var result = try ap.parse(&argv);
+    defer result.deinit();
+
+    try std.testing.expectEqualStrings("hello", result.getString("payload").?);
 }
 
 test "ArgumentParser addSelectOrAll exclusivity" {

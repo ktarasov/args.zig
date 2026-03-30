@@ -22,6 +22,16 @@ pub const Config = struct {
     case_sensitive: bool = true,
     env_prefix: ?[]const u8 = null,
     silent_errors: bool = false, // Suppress error/warning prints (useful for tests)
+    suggest_closest: bool = true,
+    suggestion_max_distance: usize = 3,
+    suggest_builtin_commands: bool = true,
+    suggest_subcommands: bool = true,
+    error_prefix: []const u8 = "Error",
+    warning_prefix: []const u8 = "Warning",
+    unknown_option_hint: ?[]const u8 = null,
+    unknown_subcommand_hint: ?[]const u8 = null,
+    unknown_option_message: ?[]const u8 = null,
+    unknown_subcommand_message: ?[]const u8 = null,
 
     // Global Application Metadata (used if not explicitly provided in init)
     app_name: ?[]const u8 = null,

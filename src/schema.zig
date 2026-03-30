@@ -7,6 +7,7 @@ const validation = @import("validation.zig");
 
 pub const ValueType = types.ValueType;
 pub const ArgAction = types.ArgAction;
+pub const DecodeMode = types.DecodeMode;
 pub const Nargs = types.Nargs;
 pub const ParsedValue = types.ParsedValue;
 
@@ -93,6 +94,9 @@ pub const ArgSpec = struct {
     validator: ?validation.ValidatorFn = null,
     callback: ?CallbackFn = null,
     expect: []const []const u8 = &.{}, // Add expect field for allowed values validation
+    suggestion_hint: ?[]const u8 = null,
+    custom_error_message: ?[]const u8 = null,
+    decode_mode: DecodeMode = .none,
 
     /// Get the destination name for storing the value.
     pub fn getDestination(self: *const ArgSpec) []const u8 {

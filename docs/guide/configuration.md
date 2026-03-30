@@ -39,6 +39,16 @@ const Config = struct {
     case_sensitive: bool = true,
     env_prefix: ?[]const u8 = null,
     silent_errors: bool = false, // Suppress error output (for tests)
+    suggest_closest: bool = true,
+    suggestion_max_distance: usize = 3,
+    suggest_builtin_commands: bool = true,
+    suggest_subcommands: bool = true,
+    error_prefix: []const u8 = "Error",
+    warning_prefix: []const u8 = "Warning",
+    unknown_option_hint: ?[]const u8 = null,
+    unknown_subcommand_hint: ?[]const u8 = null,
+    unknown_option_message: ?[]const u8 = null,
+    unknown_subcommand_message: ?[]const u8 = null,
     
     // Global Application Metadata (centralized defaults)
     app_name: ?[]const u8 = null,
@@ -84,6 +94,16 @@ const Config = struct {
 | `case_sensitive` | `true` | Case-sensitive option matching |
 | `env_prefix` | `null` | Prefix for environment variables |
 | `silent_errors` | `false` | Suppress error/warning prints (for tests) |
+| `suggest_closest` | `true` | Show spelling suggestions for close matches |
+| `suggestion_max_distance` | `3` | Max edit distance for suggestion matching |
+| `suggest_builtin_commands` | `true` | Include `--help` and `--version` in unknown-option suggestions |
+| `suggest_subcommands` | `true` | Enable closest-match suggestions for unknown subcommands |
+| `error_prefix` | `"Error"` | Prefix used for parse error output |
+| `warning_prefix` | `"Warning"` | Prefix used for warning output |
+| `unknown_option_hint` | `null` | Custom hint text printed for unknown options |
+| `unknown_subcommand_hint` | `null` | Custom hint text printed for unknown subcommands |
+| `unknown_option_message` | `null` | Override default unknown-option error text |
+| `unknown_subcommand_message` | `null` | Override default unknown-subcommand error text |
 
 ### Application Metadata (Global Defaults)
 
@@ -94,6 +114,13 @@ const Config = struct {
 | `app_description` | `null` | Default application description |
 | `app_epilog` | `null` | Default epilog text (shown after help) |
 | `app_author` | `null` | Application author information |
+
+### Help Formatting Notes
+
+- `program_name` overrides the executable name displayed in generated help usage lines.
+- `help_indent` controls the alignment column used for option descriptions.
+- `help_line_width` is used to wrap long option descriptions and metadata blocks.
+- `app_author` is printed in help output when set.
 
 ## Configuration Presets
 

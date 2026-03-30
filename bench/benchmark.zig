@@ -333,6 +333,15 @@ fn benchmarkTypedInputValidation(allocator: std.mem.Allocator) !void {
     try parseAndCleanup(&parser, &test_args);
 }
 
+fn benchmarkDecryptionOption(allocator: std.mem.Allocator) !void {
+    const test_args = [_][]const u8{ "--secret", "c2VjcmV0LXRva2Vu" };
+    var parser = try initBenchParser(allocator, "bench");
+    defer parser.deinit();
+
+    try parser.addDecryptionOption("secret", .{});
+    try parseAndCleanup(&parser, &test_args);
+}
+
 fn benchmarkSelectOrAllStrictCsv(allocator: std.mem.Allocator) !void {
     const test_args = [_][]const u8{ "--select", "users,gr,users" };
 
@@ -431,6 +440,20 @@ fn benchmarkPromptResolutionParsed(allocator: std.mem.Allocator) !void {
     _ = decision;
 }
 
+fn benchmarkSuggestionLookup(allocator: std.mem.Allocator) !void {
+    _ = allocator;
+    const candidates = [_][]const u8{ "verbose", "version", "output", "config", "endpoint", "hostname", "service" };
+    const sug = args.errors.findClosestMatch("endpont", &candidates, 3);
+    _ = sug;
+}
+
+fn benchmarkSubcommandSuggestionLookup(allocator: std.mem.Allocator) !void {
+    _ = allocator;
+    const candidates = [_][]const u8{ "init", "clone", "commit", "checkout", "status", "push", "pull" };
+    const sug = args.errors.findClosestMatch("clnoe", &candidates, 3);
+    _ = sug;
+}
+
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -462,11 +485,14 @@ pub fn main() !void {
     try results.append(allocator, try runBenchmark("Select/All CSV Strict Resolve", allocator, benchmarkSelectOrAllStrictCsv, "Workflow Helpers"));
     try results.append(allocator, try runBenchmark("Include/Exclude Strict Resolve", allocator, benchmarkIncludeExcludeStrict, "Workflow Helpers"));
     try results.append(allocator, try runBenchmark("Prompt Resolution (Parsed)", allocator, benchmarkPromptResolutionParsed, "Workflow Helpers"));
+    try results.append(allocator, try runBenchmark("Suggestion Lookup", allocator, benchmarkSuggestionLookup, "Workflow Helpers"));
+    try results.append(allocator, try runBenchmark("Subcommand Suggestion Lookup", allocator, benchmarkSubcommandSuggestionLookup, "Workflow Helpers"));
 
     // Validation
     try results.append(allocator, try runBenchmark("File Extension Validation", allocator, benchmarkFileExtensionValidation, "Validation"));
     try results.append(allocator, try runBenchmark("File Name Policy Validation", allocator, benchmarkFileNamePolicyValidation, "Validation"));
     try results.append(allocator, try runBenchmark("Typed Input Validation", allocator, benchmarkTypedInputValidation, "Validation"));
+    try results.append(allocator, try runBenchmark("Decryption Option (Base64)", allocator, benchmarkDecryptionOption, "Validation"));
 
     // Generation
     try results.append(allocator, try runBenchmark("Help Text Generation", allocator, benchmarkHelpGeneration, "Generation"));

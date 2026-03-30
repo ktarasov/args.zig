@@ -27,13 +27,14 @@ pub fn generateHelpWithConfig(allocator: std.mem.Allocator, spec: CommandSpec, u
     const yellow = Color.get(Color.yellow, use_colors);
     const green = Color.get(Color.green, use_colors);
     const cyan = Color.get(Color.cyan, use_colors);
+    const display_name = cfg.program_name orelse spec.name;
 
     if (spec.description) |desc| {
         try writer.print("{s}{s}{s}\n\n", .{ bold, desc, reset });
     }
 
     try writer.print("{s}USAGE:{s}\n", .{ yellow, reset });
-    try writer.print("    {s}{s}{s}", .{ bold, spec.name, reset });
+    try writer.print("    {s}{s}{s}", .{ bold, display_name, reset });
 
     if (spec.args.len > 0) try writer.writeAll(" [OPTIONS]");
 
@@ -157,6 +158,10 @@ pub fn generateHelpWithConfig(allocator: std.mem.Allocator, spec: CommandSpec, u
         }
     }
 
+    if (cfg.app_author) |author| {
+        try writer.print("\n{s}Author:{s} {s}\n", .{ yellow, reset, author });
+    }
+
     if (spec.epilog) |epilog| try writer.print("\n{s}\n", .{epilog});
 
     return result.toOwnedSlice(allocator);
@@ -185,29 +190,77 @@ fn printOption(writer: anytype, arg: ArgSpec, cfg: config.Config, use_colors: bo
         try writer.print(" <{s}>", .{metavar});
         opt_len += metavar.len + 3;
     }
-    const padding = if (opt_len < 24) 24 - opt_len else 2;
+    const indent_width = if (cfg.help_indent >= 4) cfg.help_indent else 4;
+    const padding = if (opt_len < indent_width) indent_width - opt_len else 2;
     try writer.writeByteNTimes(' ', padding);
-    if (arg.help) |h| try writer.writeAll(h);
+
+    var current_col = 4 + opt_len + padding;
+    if (arg.help) |h| {
+        if (cfg.help_line_width > 0 and current_col + h.len > cfg.help_line_width and cfg.help_indent > 0) {
+            try writer.writeAll("\n");
+            try writer.writeByteNTimes(' ', cfg.help_indent);
+            current_col = cfg.help_indent;
+        }
+        try writer.writeAll(h);
+        current_col += h.len;
+    }
 
     if (arg.choices.len > 0) {
         try writer.print(" {s}[choices: ", .{dim});
+        current_col += 10;
         for (arg.choices, 0..) |choice, i| {
             try writer.print("{s}", .{choice});
+            current_col += choice.len;
             if (i < arg.choices.len - 1) try writer.writeAll(", ");
+            if (i < arg.choices.len - 1) current_col += 2;
         }
         try writer.print("]{s}", .{reset});
+        current_col += 1;
     }
 
     if (cfg.show_defaults) {
-        if (arg.default) |d| try writer.print(" {s}[default: {s}]{s}", .{ dim, d, reset });
+        if (arg.default) |d| {
+            const meta_len = 11 + d.len;
+            if (cfg.help_line_width > 0 and current_col + meta_len > cfg.help_line_width and cfg.help_indent > 0) {
+                try writer.writeAll("\n");
+                try writer.writeByteNTimes(' ', cfg.help_indent);
+                current_col = cfg.help_indent;
+            }
+            try writer.print(" {s}[default: {s}]{s}", .{ dim, d, reset });
+            current_col += meta_len;
+        }
     }
     if (cfg.show_env_vars) {
-        if (arg.env_var) |e| try writer.print(" {s}[env: {s}]{s}", .{ dim, e, reset });
+        if (arg.env_var) |e| {
+            const meta_len = 7 + e.len;
+            if (cfg.help_line_width > 0 and current_col + meta_len > cfg.help_line_width and cfg.help_indent > 0) {
+                try writer.writeAll("\n");
+                try writer.writeByteNTimes(' ', cfg.help_indent);
+                current_col = cfg.help_indent;
+            }
+            try writer.print(" {s}[env: {s}]{s}", .{ dim, e, reset });
+            current_col += meta_len;
+        }
     }
     if (cfg.allow_negated_flags and arg.long != null and (arg.action == .store_true or arg.action == .store_false)) {
-        try writer.print(" {s}[negate: --no-{s}]{s}", .{ dim, arg.long.?, reset });
+        const negate = arg.long.?;
+        const meta_len = 14 + negate.len;
+        if (cfg.help_line_width > 0 and current_col + meta_len > cfg.help_line_width and cfg.help_indent > 0) {
+            try writer.writeAll("\n");
+            try writer.writeByteNTimes(' ', cfg.help_indent);
+            current_col = cfg.help_indent;
+        }
+        try writer.print(" {s}[negate: --no-{s}]{s}", .{ dim, negate, reset });
+        current_col += meta_len;
     }
-    if (arg.deprecated) |dep| try writer.print(" {s}[DEPRECATED: {s}]{s}", .{ yellow, dep, reset });
+    if (arg.deprecated) |dep| {
+        const meta_len = 14 + dep.len;
+        if (cfg.help_line_width > 0 and current_col + meta_len > cfg.help_line_width and cfg.help_indent > 0) {
+            try writer.writeAll("\n");
+            try writer.writeByteNTimes(' ', cfg.help_indent);
+        }
+        try writer.print(" {s}[DEPRECATED: {s}]{s}", .{ yellow, dep, reset });
+    }
     try writer.writeAll("\n");
 }
 
@@ -280,4 +333,49 @@ test "generateVersion" {
 
     const spec2 = CommandSpec{ .name = "app" };
     try std.testing.expectEqualStrings("unknown", generateVersion(spec2));
+}
+
+test "generateHelp uses program_name and app_author from config" {
+    const allocator = std.testing.allocator;
+
+    const spec = CommandSpec{
+        .name = "internal",
+        .description = "A configured help demo",
+        .args = &[_]ArgSpec{.{ .name = "verbose", .long = "verbose", .action = .store_true }},
+    };
+
+    const cfg = config.Config{
+        .program_name = "my-cli",
+        .app_author = "Args Maintainers",
+    };
+
+    const help_text = try generateHelpWithConfig(allocator, spec, false, cfg);
+    defer allocator.free(help_text);
+
+    try std.testing.expect(std.mem.indexOf(u8, help_text, "my-cli") != null);
+    try std.testing.expect(std.mem.indexOf(u8, help_text, "Author:") != null);
+    try std.testing.expect(std.mem.indexOf(u8, help_text, "Args Maintainers") != null);
+}
+
+test "printOption honors help_indent and line width wrapping" {
+    const allocator = std.testing.allocator;
+
+    const spec = CommandSpec{
+        .name = "wrap-test",
+        .args = &[_]ArgSpec{.{
+            .name = "long",
+            .long = "really-long-option-name",
+            .help = "This is a long help sentence that should wrap when line width is restricted.",
+        }},
+    };
+
+    const cfg = config.Config{
+        .help_indent = 12,
+        .help_line_width = 40,
+    };
+
+    const help_text = try generateHelpWithConfig(allocator, spec, false, cfg);
+    defer allocator.free(help_text);
+
+    try std.testing.expect(std.mem.indexOf(u8, help_text, "\n            This is a long help") != null);
 }

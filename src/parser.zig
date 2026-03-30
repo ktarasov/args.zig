@@ -19,6 +19,7 @@ pub const Tokenizer = tokenizer_mod.Tokenizer;
 pub const Token = tokenizer_mod.Token;
 pub const TokenType = tokenizer_mod.TokenType;
 pub const Config = config_mod.Config;
+const DecodedInput = validation.DecodedValue;
 
 /// Internal parser structure that handles the parsing state.
 pub const Parser = struct {
@@ -81,6 +82,9 @@ pub const Parser = struct {
         var result = ParseResult.init(self.allocator);
         errdefer result.deinit();
 
+        var explicit_seen = std.StringHashMap(void).init(self.allocator);
+        defer explicit_seen.deinit();
+
         for (self.spec.args) |arg| {
             if (arg.default) |def| {
                 const value = try self.parseOwnedValue(&result, def, arg.value_type);
@@ -99,9 +103,9 @@ pub const Parser = struct {
             const tok = tokenizer.next();
 
             switch (tok.token_type) {
-                .long_option => try self.handleOption(tok, &tokenizer, &result, false),
-                .short_option => try self.handleOption(tok, &tokenizer, &result, true),
-                .option_with_value => try self.handleOptionWithValue(tok, &result),
+                .long_option => try self.handleOption(tok, &tokenizer, &result, &explicit_seen, false),
+                .short_option => try self.handleOption(tok, &tokenizer, &result, &explicit_seen, true),
+                .option_with_value => try self.handleOptionWithValue(tok, &result, &explicit_seen),
                 .value => {
                     if (positional_index == 0 and self.spec.subcommands.len > 0) {
                         for (self.spec.subcommands) |sub| {
@@ -117,6 +121,24 @@ pub const Parser = struct {
                                 result.subcommand_args = try self.allocator.create(ParseResult);
                                 result.subcommand_args.?.* = sub_result;
                                 return result;
+                            }
+                        }
+
+                        if (!self.hasPositionalAt(0)) {
+                            switch (self.cfg.parsing_mode) {
+                                .strict => {
+                                    self.printUnknownSubcommandAndMaybeExit(tok.raw);
+                                    return errors.ParseError.UnknownSubcommand;
+                                },
+                                .interspersed => {
+                                    self.printUnknownSubcommandAndMaybeExit(tok.raw);
+                                    return errors.ParseError.UnknownSubcommand;
+                                },
+                                .permissive => {
+                                    try self.appendUnknownAsRemaining(&result, tok.raw);
+                                    continue;
+                                },
+                                .ignore_unknown => continue,
                             }
                         }
                     }
@@ -253,23 +275,105 @@ pub const Parser = struct {
         try result.remaining.append(self.allocator, try self.copyAndTrackSlice(result, raw));
     }
 
-    fn printUnknownOptionAndMaybeExit(self: *Parser, name: []const u8, is_short: bool) void {
-        if (!self.cfg.exit_on_error) return;
+    fn decodeInputForSpec(self: *Parser, spec: *const ArgSpec, raw: []const u8) !DecodedInput {
+        return validation.decodeValueForMode(self.allocator, raw, spec.decode_mode) catch return errors.ParseError.InvalidValue;
+    }
 
+    fn hasPositionalAt(self: *Parser, target_index: usize) bool {
+        var positional_index: usize = 0;
+        for (self.spec.args) |arg| {
+            if (!arg.positional) continue;
+            if (positional_index == target_index) return true;
+            positional_index += 1;
+        }
+        return false;
+    }
+
+    fn emitError(self: *Parser, comptime fmt: []const u8, args_tuple: anytype) void {
+        if (self.cfg.silent_errors) return;
+        std.debug.print("{s}: ", .{self.cfg.error_prefix});
+        std.debug.print(fmt, args_tuple);
+    }
+
+    fn emitWarning(self: *Parser, comptime fmt: []const u8, args_tuple: anytype) void {
+        if (self.cfg.silent_errors) return;
+        std.debug.print("{s}: ", .{self.cfg.warning_prefix});
+        std.debug.print(fmt, args_tuple);
+    }
+
+    fn emitClosestSuggestion(self: *Parser, entered: []const u8, candidates: []const []const u8, prefix: []const u8) void {
+        if (!self.cfg.suggest_closest) return;
+        if (utils.findClosest(entered, candidates, self.cfg.suggestion_max_distance)) |sug| {
+            if (!self.cfg.silent_errors) {
+                std.debug.print("\n\tDid you mean '{s}{s}'?\n", .{ prefix, sug });
+            }
+        }
+    }
+
+    fn emitClosestSuggestionWithArgHint(self: *Parser, spec: *const ArgSpec, entered: []const u8, candidates: []const []const u8, prefix: []const u8) void {
+        if (spec.suggestion_hint) |hint| {
+            if (!self.cfg.silent_errors) std.debug.print("\n\tHint: {s}\n", .{hint});
+            return;
+        }
+        self.emitClosestSuggestion(entered, candidates, prefix);
+    }
+
+    fn emitUnknownOptionFeedback(self: *Parser, name: []const u8, is_short: bool) void {
         const prefix = if (is_short) "-" else "--";
-        std.debug.print("Error: Unknown option '{s}{s}'\n", .{ prefix, name });
+        if (self.cfg.unknown_option_message) |custom| {
+            self.emitError("{s}\n", .{custom});
+        } else {
+            self.emitError("Unknown option '{s}{s}'\n", .{ prefix, name });
+        }
 
-        if (!is_short) {
+        if (self.cfg.unknown_option_hint) |hint| {
+            if (!self.cfg.silent_errors) std.debug.print("\n\tHint: {s}\n", .{hint});
+            return;
+        }
+
+        if (!is_short and self.cfg.suggest_closest) {
             var candidates: std.ArrayList([]const u8) = .empty;
             defer candidates.deinit(self.allocator);
             var it = self.long_map.keyIterator();
             while (it.next()) |k| candidates.append(self.allocator, k.*) catch break;
 
-            if (utils.findClosest(name, candidates.items, 3)) |sug| {
-                std.debug.print("\n\tDid you mean '--{s}'?\n", .{sug});
+            if (self.cfg.suggest_builtin_commands) {
+                // Include built-in pseudo options so typos like --verison can be corrected.
+                candidates.append(self.allocator, "help") catch {};
+                candidates.append(self.allocator, "version") catch {};
             }
+
+            self.emitClosestSuggestion(name, candidates.items, "--");
+        }
+    }
+
+    fn emitUnknownSubcommandFeedback(self: *Parser, entered: []const u8) void {
+        if (self.cfg.unknown_subcommand_message) |custom| {
+            self.emitError("{s}\n", .{custom});
+        } else {
+            self.emitError("Unknown subcommand '{s}'\n", .{entered});
         }
 
+        if (self.cfg.unknown_subcommand_hint) |hint| {
+            if (!self.cfg.silent_errors) std.debug.print("\n\tHint: {s}\n", .{hint});
+            return;
+        }
+
+        if (self.cfg.suggest_closest and self.cfg.suggest_subcommands) {
+            var candidates: std.ArrayList([]const u8) = .empty;
+            defer candidates.deinit(self.allocator);
+            for (self.spec.subcommands) |sub| candidates.append(self.allocator, sub.name) catch break;
+            self.emitClosestSuggestion(entered, candidates.items, "");
+        }
+    }
+
+    fn printUnknownSubcommandAndMaybeExit(self: *Parser, entered: []const u8) void {
+        self.emitUnknownSubcommandFeedback(entered);
+        if (self.cfg.exit_on_error) std.process.exit(1);
+    }
+
+    fn printUnknownOptionAndMaybeExit(self: *Parser, name: []const u8, is_short: bool) void {
+        self.emitUnknownOptionFeedback(name, is_short);
         std.process.exit(1);
     }
 
@@ -281,7 +385,11 @@ pub const Parser = struct {
             return;
         }
 
-        self.printUnknownOptionAndMaybeExit(name, is_short);
+        if (self.cfg.exit_on_error) {
+            self.printUnknownOptionAndMaybeExit(name, is_short);
+        } else {
+            self.emitUnknownOptionFeedback(name, is_short);
+        }
         return errors.ParseError.UnknownOption;
     }
 
@@ -303,7 +411,33 @@ pub const Parser = struct {
         }
     }
 
-    fn handleOption(self: *Parser, tok: Token, tokenizer: *Tokenizer, result: *ParseResult, is_short: bool) !void {
+    fn isRepeatableAction(action: types.ArgAction) bool {
+        return switch (action) {
+            .append, .count, .extend, .callback_flag => true,
+            else => false,
+        };
+    }
+
+    fn checkDuplicateArgument(
+        self: *Parser,
+        spec: *const ArgSpec,
+        seen: *std.StringHashMap(void),
+        dest: []const u8,
+    ) !void {
+        _ = self;
+        if (isRepeatableAction(spec.action)) return;
+        if (seen.contains(dest)) return errors.ParseError.DuplicateArgument;
+        try seen.put(dest, {});
+    }
+
+    fn handleOption(
+        self: *Parser,
+        tok: Token,
+        tokenizer: *Tokenizer,
+        result: *ParseResult,
+        seen: *std.StringHashMap(void),
+        is_short: bool,
+    ) !void {
         const name = tok.name orelse return errors.ParseError.InvalidFormat;
 
         if (!is_short and !self.cfg.allow_inline_values and utils.contains(name, "=")) {
@@ -343,6 +477,7 @@ pub const Parser = struct {
 
             if (!is_short) {
                 if (self.getNegatedLongSpec(name)) |negated| {
+                    try self.checkDuplicateArgument(negated.spec, seen, negated.spec.getDestination());
                     try result.put(negated.spec.getDestination(), .{ .boolean = negated.value });
                     return;
                 }
@@ -355,8 +490,14 @@ pub const Parser = struct {
         const dest = spec.getDestination();
 
         switch (spec.action) {
-            .store_true => try result.put(dest, .{ .boolean = true }),
-            .store_false => try result.put(dest, .{ .boolean = false }),
+            .store_true => {
+                try self.checkDuplicateArgument(spec, seen, dest);
+                try result.put(dest, .{ .boolean = true });
+            },
+            .store_false => {
+                try self.checkDuplicateArgument(spec, seen, dest);
+                try result.put(dest, .{ .boolean = false });
+            },
             .count => {
                 const current = result.values.get(dest);
                 const count: u32 = if (current) |c| blk: {
@@ -368,26 +509,44 @@ pub const Parser = struct {
                 const next = tokenizer.peek();
                 if (next.token_type != .value) return errors.ParseError.MissingValue;
                 _ = tokenizer.next();
+                const decoded = self.decodeInputForSpec(spec, next.raw) catch {
+                    if (spec.custom_error_message) |custom| {
+                        self.emitError("{s}\n", .{custom});
+                    } else {
+                        self.emitError("failed to decode value for argument '{s}'\n", .{spec.name});
+                    }
+                    return errors.ParseError.InvalidValue;
+                };
+                defer decoded.deinit(self.allocator);
 
                 // Validate if needed, but mainly we want to run the callback
                 if (spec.validator) |v| {
-                    const res = v(next.raw);
+                    const res = v(decoded.value);
                     if (!res.isOk()) {
+                        if (res.getMessage()) |msg| {
+                            if (spec.custom_error_message) |custom| {
+                                self.emitError("{s}\n", .{custom});
+                            } else {
+                                self.emitError("{s}\n", .{msg});
+                            }
+                        }
                         return errors.ValidationError.CustomValidationFailed;
                     }
                 }
 
                 if (spec.callback) |cb| {
-                    cb(dest, next.raw);
+                    cb(dest, decoded.value);
                 }
 
-                const value = try self.parseOwnedValue(result, next.raw, spec.value_type);
+                try self.checkDuplicateArgument(spec, seen, dest);
+                const value = try self.parseOwnedValue(result, decoded.value, spec.value_type);
                 try result.put(dest, value);
             },
             .callback_flag => {
                 if (spec.callback) |cb| {
                     cb(dest, null);
                 }
+                try self.checkDuplicateArgument(spec, seen, dest);
                 // Store as boolean true for the result map
                 try result.put(dest, .{ .boolean = true });
             },
@@ -395,46 +554,77 @@ pub const Parser = struct {
                 const next = tokenizer.peek();
                 if (next.token_type != .value) return errors.ParseError.MissingValue;
                 _ = tokenizer.next();
-                const value = try self.parseOwnedValue(result, next.raw, spec.value_type);
+                const decoded = self.decodeInputForSpec(spec, next.raw) catch {
+                    if (spec.custom_error_message) |custom| {
+                        self.emitError("{s}\n", .{custom});
+                    } else {
+                        self.emitError("failed to decode value for argument '{s}'\n", .{spec.name});
+                    }
+                    return errors.ParseError.InvalidValue;
+                };
+                defer decoded.deinit(self.allocator);
+
+                const value = try self.parseOwnedValue(result, decoded.value, spec.value_type);
                 if (spec.validator) |v| {
-                    const res = v(next.raw);
+                    const res = v(decoded.value);
                     if (!res.isOk()) {
                         return errors.ValidationError.CustomValidationFailed;
                     }
                 }
-                if (spec.choices.len > 0 and !self.validateChoiceWithCase(next.raw, spec.choices)) {
+                if (spec.choices.len > 0 and !self.validateChoiceWithCase(decoded.value, spec.choices)) {
+                    if (spec.custom_error_message) |custom| {
+                        self.emitError("{s}\n", .{custom});
+                    } else {
+                        self.emitError("invalid choice '{s}' for argument '{s}'\n", .{ decoded.value, spec.name });
+                    }
+                    self.emitClosestSuggestionWithArgHint(spec, decoded.value, spec.choices, "");
                     return errors.ParseError.InvalidChoice;
                 }
                 if (spec.expect.len > 0) {
-                    if (!self.validateChoiceWithCase(next.raw, spec.expect)) {
+                    if (!self.validateChoiceWithCase(decoded.value, spec.expect)) {
                         if (self.cfg.parsing_mode == .strict) {
-                            if (!self.cfg.silent_errors) {
-                                std.debug.print("Error: Value '{s}' is not in expected list for argument '{s}'. Expected one of: ", .{ next.raw, spec.name });
-                                for (spec.expect, 0..) |expected_val, i| {
-                                    std.debug.print("'{s}'", .{expected_val});
-                                    if (i < spec.expect.len - 1) std.debug.print(", ", .{});
-                                }
-                                std.debug.print("\n", .{});
+                            if (spec.custom_error_message) |custom| {
+                                self.emitError("{s}\n", .{custom});
+                            } else {
+                                self.emitError("Value '{s}' is not in expected list for argument '{s}'. Expected one of: ", .{ decoded.value, spec.name });
                             }
+                            if (!self.cfg.silent_errors) {
+                                if (spec.custom_error_message == null) {
+                                    for (spec.expect, 0..) |expected_val, i| {
+                                        std.debug.print("'{s}'", .{expected_val});
+                                        if (i < spec.expect.len - 1) std.debug.print(", ", .{});
+                                    }
+                                    std.debug.print("\n", .{});
+                                }
+                            }
+                            self.emitClosestSuggestionWithArgHint(spec, decoded.value, spec.expect, "");
                             if (self.cfg.exit_on_error) std.process.exit(1);
                             return errors.ParseError.InvalidValue;
                         } else {
                             // Warning mode
-                            if (!self.cfg.silent_errors) {
-                                std.debug.print("Warning: Value '{s}' is unexpected for argument '{s}'. Expected one of: ", .{ next.raw, spec.name });
-                                for (spec.expect, 0..) |expected_val, i| {
-                                    std.debug.print("'{s}'", .{expected_val});
-                                    if (i < spec.expect.len - 1) std.debug.print(", ", .{});
-                                }
-                                std.debug.print("\n", .{});
+                            if (spec.custom_error_message) |custom| {
+                                self.emitWarning("{s}\n", .{custom});
+                            } else {
+                                self.emitWarning("Value '{s}' is unexpected for argument '{s}'. Expected one of: ", .{ decoded.value, spec.name });
                             }
+                            if (!self.cfg.silent_errors) {
+                                if (spec.custom_error_message == null) {
+                                    for (spec.expect, 0..) |expected_val, i| {
+                                        std.debug.print("'{s}'", .{expected_val});
+                                        if (i < spec.expect.len - 1) std.debug.print(", ", .{});
+                                    }
+                                    std.debug.print("\n", .{});
+                                }
+                            }
+                            self.emitClosestSuggestionWithArgHint(spec, decoded.value, spec.expect, "");
                         }
                     }
                 }
 
                 if (spec.action == .append) {
-                    try result.positionals.append(self.allocator, try self.copyAndTrackSlice(result, next.raw));
+                    try result.positionals.append(self.allocator, try self.copyAndTrackSlice(result, decoded.value));
                 } else {
+                    try self.checkDuplicateArgument(spec, seen, dest);
                     try result.put(dest, value);
                 }
             },
@@ -452,7 +642,12 @@ pub const Parser = struct {
         }
     }
 
-    fn handleOptionWithValue(self: *Parser, tok: Token, result: *ParseResult) !void {
+    fn handleOptionWithValue(
+        self: *Parser,
+        tok: Token,
+        result: *ParseResult,
+        seen: *std.StringHashMap(void),
+    ) !void {
         const name = tok.name orelse return errors.ParseError.InvalidFormat;
         const value_str = tok.inline_value orelse return errors.ParseError.MissingValue;
 
@@ -477,45 +672,83 @@ pub const Parser = struct {
         }
 
         const dest = spec.getDestination();
-        const value = try self.parseOwnedValue(result, value_str, spec.value_type);
+        const decoded = self.decodeInputForSpec(spec, value_str) catch {
+            if (spec.custom_error_message) |custom| {
+                self.emitError("{s}\n", .{custom});
+            } else {
+                self.emitError("failed to decode value for argument '{s}'\n", .{spec.name});
+            }
+            return errors.ParseError.InvalidValue;
+        };
+        defer decoded.deinit(self.allocator);
+
+        const value = try self.parseOwnedValue(result, decoded.value, spec.value_type);
 
         if (spec.validator) |v| {
-            const res = v(value_str);
+            const res = v(decoded.value);
             if (!res.isOk()) {
+                if (res.getMessage()) |msg| {
+                    if (spec.custom_error_message) |custom| {
+                        self.emitError("{s}\n", .{custom});
+                    } else {
+                        self.emitError("{s}\n", .{msg});
+                    }
+                }
                 return errors.ValidationError.CustomValidationFailed;
             }
         }
 
-        if (spec.choices.len > 0 and !self.validateChoiceWithCase(value_str, spec.choices)) {
+        if (spec.choices.len > 0 and !self.validateChoiceWithCase(decoded.value, spec.choices)) {
+            if (spec.custom_error_message) |custom| {
+                self.emitError("{s}\n", .{custom});
+            } else {
+                self.emitError("invalid choice '{s}' for argument '{s}'\n", .{ decoded.value, spec.name });
+            }
+            self.emitClosestSuggestionWithArgHint(spec, decoded.value, spec.choices, "");
             return errors.ParseError.InvalidChoice;
         }
 
         if (spec.expect.len > 0) {
-            if (!self.validateChoiceWithCase(value_str, spec.expect)) {
+            if (!self.validateChoiceWithCase(decoded.value, spec.expect)) {
                 if (self.cfg.parsing_mode == .strict) {
-                    if (!self.cfg.silent_errors) {
-                        std.debug.print("Error: Value '{s}' is not in expected list for argument '{s}'. Expected one of: ", .{ value_str, spec.name });
-                        for (spec.expect, 0..) |expected_val, i| {
-                            std.debug.print("'{s}'", .{expected_val});
-                            if (i < spec.expect.len - 1) std.debug.print(", ", .{});
-                        }
-                        std.debug.print("\n", .{});
+                    if (spec.custom_error_message) |custom| {
+                        self.emitError("{s}\n", .{custom});
+                    } else {
+                        self.emitError("Value '{s}' is not in expected list for argument '{s}'. Expected one of: ", .{ decoded.value, spec.name });
                     }
+                    if (!self.cfg.silent_errors) {
+                        if (spec.custom_error_message == null) {
+                            for (spec.expect, 0..) |expected_val, i| {
+                                std.debug.print("'{s}'", .{expected_val});
+                                if (i < spec.expect.len - 1) std.debug.print(", ", .{});
+                            }
+                            std.debug.print("\n", .{});
+                        }
+                    }
+                    self.emitClosestSuggestionWithArgHint(spec, decoded.value, spec.expect, "");
                     if (self.cfg.exit_on_error) std.process.exit(1);
                     return errors.ParseError.InvalidValue;
                 } else {
-                    if (!self.cfg.silent_errors) {
-                        std.debug.print("Warning: Value '{s}' is unexpected for argument '{s}'. Expected one of: ", .{ value_str, spec.name });
-                        for (spec.expect, 0..) |expected_val, i| {
-                            std.debug.print("'{s}'", .{expected_val});
-                            if (i < spec.expect.len - 1) std.debug.print(", ", .{});
-                        }
-                        std.debug.print("\n", .{});
+                    if (spec.custom_error_message) |custom| {
+                        self.emitWarning("{s}\n", .{custom});
+                    } else {
+                        self.emitWarning("Value '{s}' is unexpected for argument '{s}'. Expected one of: ", .{ decoded.value, spec.name });
                     }
+                    if (!self.cfg.silent_errors) {
+                        if (spec.custom_error_message == null) {
+                            for (spec.expect, 0..) |expected_val, i| {
+                                std.debug.print("'{s}'", .{expected_val});
+                                if (i < spec.expect.len - 1) std.debug.print(", ", .{});
+                            }
+                            std.debug.print("\n", .{});
+                        }
+                    }
+                    self.emitClosestSuggestionWithArgHint(spec, decoded.value, spec.expect, "");
                 }
             }
         }
 
+        try self.checkDuplicateArgument(spec, seen, dest);
         try result.put(dest, value);
     }
 
@@ -524,17 +757,20 @@ pub const Parser = struct {
         for (self.spec.args) |arg| {
             if (arg.positional) {
                 if (pos_idx == index) {
-                    const value = try self.parseOwnedValue(result, value_str, arg.value_type);
+                    const decoded = self.decodeInputForSpec(&arg, value_str) catch return errors.ParseError.InvalidValue;
+                    defer decoded.deinit(self.allocator);
+
+                    const value = try self.parseOwnedValue(result, decoded.value, arg.value_type);
                     if (arg.validator) |v| {
-                        const res = v(value_str);
+                        const res = v(decoded.value);
                         if (!res.isOk()) {
                             return errors.ValidationError.CustomValidationFailed;
                         }
                     }
-                    if (arg.choices.len > 0 and !self.validateChoiceWithCase(value_str, arg.choices)) {
+                    if (arg.choices.len > 0 and !self.validateChoiceWithCase(decoded.value, arg.choices)) {
                         return errors.ParseError.InvalidChoice;
                     }
-                    if (arg.expect.len > 0 and !self.validateChoiceWithCase(value_str, arg.expect)) {
+                    if (arg.expect.len > 0 and !self.validateChoiceWithCase(decoded.value, arg.expect)) {
                         if (self.cfg.parsing_mode == .strict) {
                             return errors.ParseError.InvalidValue;
                         }
@@ -687,6 +923,151 @@ test "Parser default values" {
     defer result.deinit();
 
     try std.testing.expectEqual(@as(?i64, 10), result.getInt("count"));
+}
+
+test "Parser duplicate singleton option returns DuplicateArgument" {
+    const allocator = std.testing.allocator;
+    config_mod.initConfig(.{ .exit_on_error = false });
+    defer config_mod.resetConfig();
+
+    const spec = CommandSpec{
+        .name = "test",
+        .add_help = false,
+        .args = &[_]ArgSpec{.{ .name = "email", .long = "email" }},
+    };
+
+    var parser = try Parser.init(allocator, spec);
+    defer parser.deinit();
+
+    const argv = [_][]const u8{ "--email", "one@example.com", "--email", "two@example.com" };
+    try std.testing.expectError(errors.ParseError.DuplicateArgument, parser.parse(&argv));
+}
+
+test "Parser decodes base64 option values" {
+    const allocator = std.testing.allocator;
+    config_mod.initConfig(.{ .exit_on_error = false, .silent_errors = true });
+    defer config_mod.resetConfig();
+
+    const spec = CommandSpec{
+        .name = "decode",
+        .add_help = false,
+        .args = &[_]ArgSpec{.{ .name = "secret", .long = "secret", .decode_mode = .base64_std }},
+    };
+
+    var parser = try Parser.init(allocator, spec);
+    defer parser.deinit();
+
+    const argv = [_][]const u8{ "--secret", "c2VjcmV0" };
+    var result = try parser.parse(&argv);
+    defer result.deinit();
+
+    try std.testing.expectEqualStrings("secret", result.getString("secret").?);
+}
+
+test "Parser invalid base64 decode returns InvalidValue" {
+    const allocator = std.testing.allocator;
+    config_mod.initConfig(.{ .exit_on_error = false, .silent_errors = true });
+    defer config_mod.resetConfig();
+
+    const spec = CommandSpec{
+        .name = "decode",
+        .add_help = false,
+        .args = &[_]ArgSpec{.{ .name = "secret", .long = "secret", .decode_mode = .base64_std }},
+    };
+
+    var parser = try Parser.init(allocator, spec);
+    defer parser.deinit();
+
+    const argv = [_][]const u8{ "--secret", "@@not-base64@@" };
+    try std.testing.expectError(errors.ParseError.InvalidValue, parser.parse(&argv));
+}
+
+test "Parser duplicate count option is allowed" {
+    const allocator = std.testing.allocator;
+    config_mod.initConfig(.{ .exit_on_error = false });
+    defer config_mod.resetConfig();
+
+    const spec = CommandSpec{
+        .name = "test",
+        .add_help = false,
+        .args = &[_]ArgSpec{.{ .name = "verbose", .short = 'v', .action = .count }},
+    };
+
+    var parser = try Parser.init(allocator, spec);
+    defer parser.deinit();
+
+    const argv = [_][]const u8{ "-v", "-v" };
+    var result = try parser.parse(&argv);
+    defer result.deinit();
+    try std.testing.expectEqual(@as(?i64, 2), result.getInt("verbose"));
+}
+
+test "Parser unknown subcommand returns UnknownSubcommand when no positional exists" {
+    const allocator = std.testing.allocator;
+    config_mod.initConfig(.{ .exit_on_error = false, .parsing_mode = .strict, .silent_errors = true });
+    defer config_mod.resetConfig();
+
+    const spec = CommandSpec{
+        .name = "git-like",
+        .add_help = false,
+        .subcommands = &[_]schema_mod.SubcommandSpec{
+            .{ .name = "clone", .help = "Clone repo" },
+            .{ .name = "commit", .help = "Commit changes" },
+        },
+    };
+
+    var parser = try Parser.init(allocator, spec);
+    defer parser.deinit();
+
+    const argv = [_][]const u8{"clnoe"};
+    try std.testing.expectError(errors.ParseError.UnknownSubcommand, parser.parse(&argv));
+}
+
+test "Parser unknown subcommand in permissive mode is collected as remaining" {
+    const allocator = std.testing.allocator;
+    config_mod.initConfig(.{ .exit_on_error = false, .parsing_mode = .permissive, .silent_errors = true });
+    defer config_mod.resetConfig();
+
+    const spec = CommandSpec{
+        .name = "git-like",
+        .add_help = false,
+        .subcommands = &[_]schema_mod.SubcommandSpec{
+            .{ .name = "clone", .help = "Clone repo" },
+            .{ .name = "commit", .help = "Commit changes" },
+        },
+    };
+
+    var parser = try Parser.init(allocator, spec);
+    defer parser.deinit();
+
+    const argv = [_][]const u8{"clnoe"};
+    var result = try parser.parse(&argv);
+    defer result.deinit();
+    try std.testing.expectEqual(@as(usize, 1), result.remaining.items.len);
+    try std.testing.expectEqualStrings("clnoe", result.remaining.items[0]);
+}
+
+test "Parser first token can remain positional even when subcommands exist" {
+    const allocator = std.testing.allocator;
+    config_mod.initConfig(.{ .exit_on_error = false, .parsing_mode = .strict, .silent_errors = true });
+    defer config_mod.resetConfig();
+
+    const spec = CommandSpec{
+        .name = "mixed",
+        .add_help = false,
+        .args = &[_]ArgSpec{.{ .name = "target", .positional = true }},
+        .subcommands = &[_]schema_mod.SubcommandSpec{
+            .{ .name = "init", .help = "Initialize" },
+        },
+    };
+
+    var parser = try Parser.init(allocator, spec);
+    defer parser.deinit();
+
+    const argv = [_][]const u8{"unknown-value"};
+    var result = try parser.parse(&argv);
+    defer result.deinit();
+    try std.testing.expectEqualStrings("unknown-value", result.getString("target").?);
 }
 
 test "Parser separator handling" {

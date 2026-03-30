@@ -89,6 +89,13 @@ pub const ArgAction = enum {
     }
 };
 
+/// Controls optional decode/decryption processing for incoming string values.
+pub const DecodeMode = enum {
+    none,
+    base64_std,
+    base64_url_safe,
+};
+
 /// Specifies how many values an argument accepts.
 pub const Nargs = union(enum) {
     exact: usize,

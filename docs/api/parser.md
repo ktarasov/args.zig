@@ -61,6 +61,10 @@ Releases all resources used by the parser.
 - Long boolean options support `--no-<name>` when `Config.allow_negated_flags = true` (default).
 - Inline values are rejected for flag-style actions (`store_true`, `store_false`, `count`, `help`, `version`).
 - When `Config.case_sensitive = false`, long option names and `choices` / `expect` checks are ASCII case-insensitive.
+- In `strict` mode, unknown long options and unknown subcommands can emit closest-match suggestions when `Config.suggest_closest = true`.
+- Built-in names `--help` and `--version` are included in unknown-option suggestion candidates when `Config.suggest_builtin_commands = true`.
+- Unknown subcommand suggestions are controlled by `Config.suggest_subcommands`.
+- Help generation respects `Config.program_name`, `Config.help_indent`, and `Config.help_line_width`.
 
 ## Adding Arguments
 
@@ -100,7 +104,13 @@ pub fn addOption(self: *ArgumentParser, name: []const u8, options: struct {
     dest: ?[]const u8 = null,
     env_var: ?[]const u8 = null,
     hidden: bool = false,
+    aliases: []const []const u8 = &.{},
     deprecated: ?[]const u8 = null,
+    validator: ?validation.ValidatorFn = null,
+    expect: []const []const u8 = &.{},
+    suggestion_hint: ?[]const u8 = null,
+    custom_error_message: ?[]const u8 = null,
+    decode_mode: DecodeMode = .none,
 }) !void
 ```
 
@@ -129,6 +139,7 @@ pub fn addPositional(self: *ArgumentParser, name: []const u8, options: struct {
     expect: []const []const u8 = &.{},
     validator: ?validation.ValidatorFn = null,
     hidden: bool = false,
+    decode_mode: DecodeMode = .none,
 }) !void
 ```
 
@@ -141,6 +152,30 @@ try parser.addPositional("input", .{
     .required = true,
 });
 ```
+
+### `addDecryptionOption`
+
+```zig
+pub fn addDecryptionOption(self: *ArgumentParser, name: []const u8, options: struct {
+    short: ?u8 = null,
+    help: ?[]const u8 = null,
+    default: ?[]const u8 = null,
+    required: bool = false,
+    metavar: ?[]const u8 = "BASE64",
+    dest: ?[]const u8 = null,
+    env_var: ?[]const u8 = null,
+    hidden: bool = false,
+    aliases: []const []const u8 = &.{},
+    deprecated: ?[]const u8 = null,
+    validator: ?validation.ValidatorFn = null,
+    expect: []const []const u8 = &.{},
+    suggestion_hint: ?[]const u8 = null,
+    custom_error_message: ?[]const u8 = null,
+    url_safe: bool = false,
+}) !void
+```
+
+Adds a string option that decodes incoming Base64 input before validation and storage.
 
 ### `addFalseFlag`
 

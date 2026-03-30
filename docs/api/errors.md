@@ -86,6 +86,48 @@ Strict include/exclude helpers may also return:
 
 ## Error Handling
 
+### Duplicate Option Behavior
+
+Singleton options (for example standard `store` options and most typed helpers) now return `DuplicateArgument` when provided multiple times.
+
+Repeatable actions such as `count`, `append`, `extend`, and `callback_flag` continue to allow multiple occurrences.
+
+```zig
+const argv = [_][]const u8{ "--email", "a@example.com", "--email", "b@example.com" };
+_ = parser.parse(&argv) catch |err| {
+    if (err == error.DuplicateArgument) {
+        std.debug.print("Error: duplicate argument\n", .{});
+    }
+    return;
+};
+```
+
+### Unknown Option Suggestions
+
+In `strict` mode, unknown long options include a "Did you mean" suggestion when a close match exists.
+
+Built-in command options (`--help`, `--version`) are also included in suggestion candidates.
+
+Unknown subcommands also use closest-match suggestions when the command declares subcommands and no first positional argument is defined.
+
+Suggestion behavior is configurable through `Config`:
+
+- `suggest_closest`
+- `suggestion_max_distance`
+- `suggest_builtin_commands`
+- `suggest_subcommands`
+- `error_prefix`
+- `warning_prefix`
+- `unknown_option_hint`
+- `unknown_subcommand_hint`
+- `unknown_option_message`
+- `unknown_subcommand_message`
+
+For value errors, you can provide option-level customization with:
+
+- `suggestion_hint` (display a custom hint)
+- `custom_error_message` (override default validation message)
+
 ### Basic Error Handling
 
 ```zig

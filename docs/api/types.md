@@ -228,6 +228,22 @@ pub const Config = struct {
     allow_negated_flags: bool = true,
     case_sensitive: bool = true,
     env_prefix: ?[]const u8 = null,
+    silent_errors: bool = false,
+    suggest_closest: bool = true,
+    suggestion_max_distance: usize = 3,
+    suggest_builtin_commands: bool = true,
+    suggest_subcommands: bool = true,
+    error_prefix: []const u8 = "Error",
+    warning_prefix: []const u8 = "Warning",
+    unknown_option_hint: ?[]const u8 = null,
+    unknown_subcommand_hint: ?[]const u8 = null,
+    unknown_option_message: ?[]const u8 = null,
+    unknown_subcommand_message: ?[]const u8 = null,
+    app_name: ?[]const u8 = null,
+    app_version: ?[]const u8 = null,
+    app_description: ?[]const u8 = null,
+    app_epilog: ?[]const u8 = null,
+    app_author: ?[]const u8 = null,
 };
 ```
 
@@ -273,6 +289,18 @@ pub const ParsingMode = enum {
     permissive,     // Collect unknown
     ignore_unknown, // Silently ignore
     interspersed,   // Allow mixed order
+};
+```
+
+## DecodeMode
+
+Controls optional input decoding/decryption before validation and value storage.
+
+```zig
+pub const DecodeMode = enum {
+    none,
+    base64_std,
+    base64_url_safe,
 };
 ```
 

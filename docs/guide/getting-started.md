@@ -135,6 +135,26 @@ zig build run -- --help
 # The help output is formatted for better understanding 🎨
 ```
 
+## Validation Commands
+
+Use these commands while developing with args.zig:
+
+```bash
+# Run test suite for your current host target
+zig build test
+
+# Run all maintained examples
+zig build run-all-examples
+zig build run-update_check
+
+# Cross-target compile checks
+zig build -Dtarget=x86_64-windows-gnu
+zig build -Dtarget=x86_64-linux-gnu
+zig build -Dtarget=aarch64-macos
+```
+
+For full runtime test execution on Linux/macOS targets, run `zig build test -Dtarget=...` on a matching host or CI runner.
+
 ## Version Information
 
 You can access version information in your code:
