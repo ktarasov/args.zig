@@ -2,7 +2,7 @@ const std = @import("std");
 const args = @import("args");
 
 pub fn main(init: std.process.Init) !void {
-    const allocator = std.heap.c_allocator;
+    const allocator = init.arena.allocator();
 
     var parser = try args.ArgumentParser.init(allocator, .{
         .name = "question-flow",
@@ -40,3 +40,4 @@ pub fn main(init: std.process.Init) !void {
         .selected => |name| std.debug.print("Decision: {s}\n", .{name}),
     }
 }
+

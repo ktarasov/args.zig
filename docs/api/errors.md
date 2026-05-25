@@ -86,6 +86,20 @@ Strict include/exclude helpers may also return:
 
 ## Error Handling
 
+### Formatting Helpers
+
+The shared errors module includes simple message formatters for the three main error families:
+
+```zig
+const errors = @import("args").errors;
+
+std.debug.print("{s}\n", .{errors.formatParseError(error.UnknownOption)});
+std.debug.print("{s}\n", .{errors.formatSchemaError(errors.SchemaError.InvalidLongName)});
+std.debug.print("{s}\n", .{errors.formatValidationError(errors.ValidationError.InvalidPath)});
+```
+
+These helpers keep CLI error output consistent while still letting applications decide how to display or decorate the message.
+
 ### Duplicate Option Behavior
 
 Singleton options (for example standard `store` options and most typed helpers) now return `DuplicateArgument` when provided multiple times.

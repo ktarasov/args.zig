@@ -2,8 +2,7 @@ const std = @import("std");
 const args = @import("args");
 
 pub fn main(init: std.process.Init) !void {
-    _ = init;
-    const allocator = std.heap.c_allocator;
+    const allocator = init.arena.allocator();
 
     var parser = try args.ArgumentParser.init(allocator, .{
         .name = "include-exclude-strict",
@@ -43,3 +42,5 @@ pub fn main(init: std.process.Init) !void {
         std.debug.print("  - {s}\n", .{item});
     }
 }
+
+

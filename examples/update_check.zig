@@ -6,7 +6,7 @@ const args = @import("args");
 
 pub fn main(init: std.process.Init) !void {
     // Setup allocator
-    const allocator = std.heap.c_allocator;
+    const allocator = init.arena.allocator();
 
     // Display library version info
     std.debug.print("args.zig Library Information:\n", .{});
@@ -83,3 +83,4 @@ pub fn main(init: std.process.Init) !void {
     defer allocator.free(help_text);
     std.debug.print("{s}", .{help_text});
 }
+

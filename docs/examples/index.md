@@ -663,6 +663,250 @@ pub fn main(init: std.process.Init) !void {
 }
 ```
 
+## Typed Numeric Options Example
+
+Using `addIntOption`, `addFloatOption`, and `addUintOption` helpers:
+
+```zig
+const std = @import("std");
+const args = @import("args");
+
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.arena.allocator();
+
+    var parser = try args.ArgumentParser.init(allocator, .{
+        .name = "numeric-demo",
+        .version = "1.0.0",
+        .description = "Demonstrates typed integer and float options",
+    });
+    defer parser.deinit();
+
+    try parser.addIntOption("count", .{
+        .short = 'n', .help = "Number of items", .default = "10",
+    });
+
+    try parser.addIntOption("retries", .{
+        .short = 'r', .help = "Retry count", .default = "3",
+    });
+
+    try parser.addUintOption("threads", .{
+        .short = 't', .help = "Worker thread count", .default = "4",
+    });
+
+    try parser.addFloatOption("threshold", .{
+        .short = 'h', .help = "Confidence threshold", .default = "0.75",
+    });
+
+    var result = try parser.parseProcess(init);
+    defer result.deinit();
+
+    std.debug.print("count     = {d}\n", .{result.get("count").?.asInt().?});
+    std.debug.print("retries   = {d}\n", .{result.get("retries").?.asInt().?});
+    std.debug.print("threads   = {d}\n", .{result.get("threads").?.asUint().?});
+    std.debug.print("threshold = {d:.2}\n", .{result.get("threshold").?.asFloat().?});
+}
+```
+
+**Usage:**
+```bash
+numeric-demo --count 25 --retries 5 --threads 8 --threshold 0.95
+```
+
+## Hex Decode Option Example
+
+Passing binary data as hex strings with `addHexOption`:
+
+```zig
+const std = @import("std");
+const args = @import("args");
+
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.arena.allocator();
+
+    var parser = try args.ArgumentParser.init(allocator, .{
+        .name = "hex-demo",
+        .version = "1.0.0",
+        .description = "Demonstrates hex-decode option",
+    });
+    defer parser.deinit();
+
+    try parser.addHexOption("data", .{
+        .short = 'd', .help = "Hex-encoded binary data", .metavar = "HEX",
+    });
+
+    try parser.addHexOption("key", .{
+        .short = 'k', .help = "Hex-encoded key material", .required = true,
+    });
+
+    var result = try parser.parseProcess(init);
+    defer result.deinit();
+
+    if (result.get("data")) |d| {
+        std.debug.print("--data decoded: {any} ({d} bytes)\n", .{ d.asString().?, (d.asString() orelse "").len });
+    }
+    if (result.get("key")) |k| {
+        std.debug.print("--key  decoded: {any} ({d} bytes)\n", .{ k.asString().?, (k.asString() orelse "").len });
+    }
+}
+```
+
+**Usage:**
+```bash
+hex-demo --data deadbeef --key 0123456789abcdef
+```
+
+## Log Level Example
+
+Using `addLogLevel` for `--verbose` / `--quiet` pairs:
+
+```zig
+const std = @import("std");
+const args = @import("args");
+
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.arena.allocator();
+
+    var parser = try args.ArgumentParser.init(allocator, .{
+        .name = "log-demo",
+        .version = "1.0.0",
+        .description = "Demonstrates log-level helpers",
+    });
+    defer parser.deinit();
+
+    try parser.addLogLevel(
+        .{ .name = "verbose", .short = 'v', .dest = "verbosity" },
+        .{ .name = "quiet",   .short = 'q', .dest = "verbosity" },
+    );
+
+    try parser.addFlag("dry-run", .{ .help = "Simulate execution" });
+
+    var result = try parser.parseProcess(init);
+    defer result.deinit();
+
+    const verbosity = result.get("verbosity").?.asInt().? orelse 0;
+    std.debug.print("Verbosity level: {d}\n", .{verbosity});
+    if (verbosity >= 1) std.debug.print("  verbose mode\n", .{});
+    if (verbosity >= 2) std.debug.print("  debug output\n", .{});
+}
+```
+
+**Usage:**
+```bash
+log-demo -vvv              # Verbosity level: 3
+log-demo -v -q             # Verbosity level: 0
+log-demo -v -v -qq         # Verbosity level: 0
+```
+
+## Advanced parseInto Example
+
+Parsing into a struct with enums, u32, f64, and optional fields. Enum variants become `--flag` choices automatically:
+
+```zig
+const std = @import("std");
+const args = @import("args");
+
+const LogLevel = enum { debug, info, warn, err };
+const OutputFormat = enum { json, yaml, csv, table };
+
+const CliConfig = struct {
+    verbose: bool = false,
+    log_level: LogLevel = .info,
+    format: OutputFormat = .table,
+    port: u32 = 8080,
+    timeout: f64 = 30.0,
+    host: []const u8 = "localhost",
+    config_file: ?[]const u8 = null,
+};
+
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.arena.allocator();
+
+    var result = try args.parseInto(allocator, CliConfig, .{
+        .name = "struct-demo",
+        .version = "1.0.0",
+        .description = "parseInto with enums, u32, f64, and more",
+    }, null, init);
+    defer result.deinit();
+
+    const cfg = result.options;
+
+    std.debug.print("Configuration:\n", .{});
+    std.debug.print("  verbose     = {}\n", .{cfg.verbose});
+    std.debug.print("  log-level   = {s}\n", .{@tagName(cfg.log_level)});
+    std.debug.print("  format      = {s}\n", .{@tagName(cfg.format)});
+    std.debug.print("  port        = {d}\n", .{cfg.port});
+    std.debug.print("  timeout     = {d:.1}s\n", .{cfg.timeout});
+    std.debug.print("  host        = {s}\n", .{cfg.host});
+    if (cfg.config_file) |f| {
+        std.debug.print("  config-file = {s}\n", .{f});
+    }
+}
+```
+
+**Usage:**
+```bash
+struct-demo --verbose --log-level debug --format json --port 3000 --timeout 60.0 --host 0.0.0.0
+```
+
+## Environment Variable Configuration Example
+
+Using `env_var`, `env_prefix`, and `fromEnvOrDefault`:
+
+```zig
+const std = @import("std");
+const args = @import("args");
+
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.arena.allocator();
+
+    var parser = try args.ArgumentParser.init(allocator, .{
+        .name = "env-demo",
+        .version = "1.0.0",
+        .description = "Demonstrates environment variable configuration",
+        .config = args.Config{ .env_prefix = "MYAPP" },
+    });
+    defer parser.deinit();
+
+    try parser.addOption("db-host", .{
+        .short = 'h', .help = "Database host", .default = "localhost",
+        .env_var = "MYAPP_DB_HOST",
+    });
+
+    try parser.addIntOption("db-port", .{
+        .short = 'p', .help = "Database port", .default = "5432",
+        .env_var = "MYAPP_DB_PORT",
+    });
+
+    try parser.addOption("db-name", .{
+        .short = 'd', .help = "Database name", .default = "mydb",
+        .env_var = "MYAPP_DB_NAME",
+    });
+
+    try parser.fromEnvOrDefault("api-key", "MYAPP_API_KEY", "no-key-set", .{
+        .help = "API key (from MYAPP_API_KEY env var)",
+    });
+
+    var result = try parser.parseProcess(init);
+    defer result.deinit();
+
+    std.debug.print("DB Host: {s}\n", .{result.get("db-host").?.asString().?});
+    std.debug.print("DB Port: {d}\n", .{result.get("db-port").?.asInt().?});
+    std.debug.print("DB Name: {s}\n", .{result.get("db-name").?.asString().?});
+    std.debug.print("API Key: {s}\n", .{result.get("api-key").?.asString().?});
+}
+```
+
+**Usage:**
+```bash
+# Values from command-line:
+env-demo -h prod.example.com -p 5432 -d analytics
+
+# Values from environment variables:
+export MYAPP_DB_HOST=prod.example.com
+export MYAPP_DB_PORT=5432
+env-demo
+```
+
 ## Running the Examples
 
 Build and run examples with:
@@ -676,6 +920,27 @@ zig build run-basic
 
 # Run advanced example
 zig build run-advanced
+
+# Run typed numeric options
+zig build run-int_float_options
+
+# Run hex decode example
+zig build run-hex_option
+
+# Run log level example
+zig build run-log_level
+
+# Run advanced struct/parseInto example
+zig build run-advanced_struct
+
+# Run env var config example
+zig build run-env_var_config
+
+# Run list option example
+zig build run-list_option
+
+# Run validation demo example
+zig build run-validation_demo
 
 # Run update check example
 zig build run-update_check

@@ -34,9 +34,15 @@ fn onOutput(name: []const u8, value: ?[]const u8) void {
     }
 }
 
-pub fn main() !void {
-    // ... init parser ...
-    
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.arena.allocator();
+
+    var parser = try args.ArgumentParser.init(allocator, .{
+        .name = "callback-demo",
+        .description = "Demonstrates using callbacks for arguments",
+    });
+    defer parser.deinit();
+
     try parser.addArg(.{
         .name = "output",
         .long = "output",
@@ -44,8 +50,11 @@ pub fn main() !void {
         .callback = onOutput,
         .help = "Output file (triggers callback)",
     });
-    
-    // ... parse ...
+
+    var result = try parser.parseProcess(init);
+    defer result.deinit();
+
+    _ = result;
 }
 ```
 

@@ -94,6 +94,7 @@ pub const DecodeMode = enum {
     none,
     base64_std,
     base64_url_safe,
+    hex,
 };
 
 /// Specifies how many values an argument accepts.
@@ -307,10 +308,59 @@ pub const ParseResult = struct {
         return val.asFloat();
     }
 
+    /// Get an unsigned integer value by name.
+    pub fn getUint(self: *const ParseResult, name: []const u8) ?u64 {
+        const val = self.values.get(name) orelse return null;
+        return val.asUint();
+    }
+
     /// Get a key-value pair by name.
     pub fn getKeyValue(self: *const ParseResult, name: []const u8) ?KeyValue {
         const val = self.values.get(name) orelse return null;
         return val.asKeyValue();
+    }
+
+    /// Get an array value by name.
+    pub fn getArray(self: *const ParseResult, name: []const u8) ?[]const []const u8 {
+        const val = self.values.get(name) orelse return null;
+        return switch (val) {
+            .array => |a| a,
+            else => null,
+        };
+    }
+
+    /// Get an enum value by name, converting the string value to the given enum type.
+    pub fn getEnum(self: *const ParseResult, comptime T: type, name: []const u8) ?T {
+        const str = self.getString(name) orelse return null;
+        inline for (@typeInfo(T).@"enum".fields) |field| {
+            if (std.mem.eql(u8, str, field.name)) return @field(T, field.name);
+        }
+        return null;
+    }
+
+    /// Get a string value with a default fallback.
+    pub fn getOrString(self: *const ParseResult, name: []const u8, default: []const u8) []const u8 {
+        return self.getString(name) orelse default;
+    }
+
+    /// Get an integer value with a default fallback.
+    pub fn getOrInt(self: *const ParseResult, name: []const u8, default: i64) i64 {
+        return self.getInt(name) orelse default;
+    }
+
+    /// Get a boolean value with a default fallback.
+    pub fn getOrBool(self: *const ParseResult, name: []const u8, default: bool) bool {
+        return self.getBool(name) orelse default;
+    }
+
+    /// Get a float value with a default fallback.
+    pub fn getOrFloat(self: *const ParseResult, name: []const u8, default: f64) f64 {
+        return self.getFloat(name) orelse default;
+    }
+
+    /// Get an unsigned integer value with a default fallback.
+    pub fn getOrUint(self: *const ParseResult, name: []const u8, default: u64) u64 {
+        return self.getUint(name) orelse default;
     }
 
     /// Check if a value exists.
@@ -471,6 +521,48 @@ test "ParseResult.get methods" {
     try std.testing.expect(@abs(result.getFloat("rate").? - 3.14) < 0.001);
     try std.testing.expect(result.contains("str"));
     try std.testing.expect(!result.contains("nonexistent"));
+}
+
+test "ParseResult.getUint and getArray" {
+    var result = ParseResult.init(std.testing.allocator);
+    defer result.deinit();
+
+    try result.values.put("uid", ParsedValue{ .uint = 42 });
+    try result.values.put("str", ParsedValue{ .string = "debug" });
+    try result.values.put("arr", ParsedValue{ .array = &.{ "a", "b", "c" } });
+
+    try std.testing.expectEqual(@as(?u64, 42), result.getUint("uid"));
+    try std.testing.expectEqual(@as(?u64, null), result.getUint("str"));
+
+    const arr = result.getArray("arr").?;
+    try std.testing.expectEqual(@as(usize, 3), arr.len);
+    try std.testing.expectEqualStrings("a", arr[0]);
+}
+
+test "ParseResult.getOr* methods" {
+    var result = ParseResult.init(std.testing.allocator);
+    defer result.deinit();
+
+    try result.values.put("str", ParsedValue{ .string = "hello" });
+    try result.values.put("num", ParsedValue{ .int = 42 });
+    try result.values.put("flag", ParsedValue{ .boolean = true });
+    try result.values.put("rate", ParsedValue{ .float = 3.14 });
+    try result.values.put("uid", ParsedValue{ .uint = 100 });
+
+    try std.testing.expectEqualStrings("hello", result.getOrString("str", "default"));
+    try std.testing.expectEqualStrings("default", result.getOrString("missing", "default"));
+
+    try std.testing.expectEqual(@as(i64, 42), result.getOrInt("num", 0));
+    try std.testing.expectEqual(@as(i64, -1), result.getOrInt("missing", -1));
+
+    try std.testing.expectEqual(true, result.getOrBool("flag", false));
+    try std.testing.expectEqual(false, result.getOrBool("missing", false));
+
+    try std.testing.expect(@abs(result.getOrFloat("rate", 0.0) - 3.14) < 0.001);
+    try std.testing.expect(@abs(result.getOrFloat("missing", 1.5) - 1.5) < 0.001);
+
+    try std.testing.expectEqual(@as(u64, 100), result.getOrUint("uid", 0));
+    try std.testing.expectEqual(@as(u64, 42), result.getOrUint("missing", 42));
 }
 
 test "ParseResult.positionalCount" {

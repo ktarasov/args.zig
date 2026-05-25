@@ -569,7 +569,10 @@ pub const Parser = struct {
                 };
                 defer decoded.deinit(self.allocator);
 
-                const value = try self.parseOwnedValue(result, decoded.value, spec.value_type);
+                const value = if (spec.value_type == .array and spec.separator != 0)
+                    try self.parseOwnedArrayValue(result, decoded.value, spec.separator)
+                else
+                    try self.parseOwnedValue(result, decoded.value, spec.value_type);
                 if (spec.validator) |v| {
                     const res = v(self.io, decoded.value);
                     if (!res.isOk()) {
@@ -687,7 +690,10 @@ pub const Parser = struct {
         };
         defer decoded.deinit(self.allocator);
 
-        const value = try self.parseOwnedValue(result, decoded.value, spec.value_type);
+        const value = if (spec.value_type == .array and spec.separator != 0)
+            try self.parseOwnedArrayValue(result, decoded.value, spec.separator)
+        else
+            try self.parseOwnedValue(result, decoded.value, spec.value_type);
 
         if (spec.validator) |v| {
             const res = v(self.io, decoded.value);
@@ -799,6 +805,34 @@ pub const Parser = struct {
     fn parseOwnedValue(self: *Parser, result: *ParseResult, raw: []const u8, value_type: types.ValueType) !ParsedValue {
         const owned = try self.copyAndTrackSlice(result, raw);
         return validation.parseValue(owned, value_type, self.allocator);
+    }
+
+    fn parseOwnedArrayValue(self: *Parser, result: *ParseResult, raw: []const u8, separator: u8) !ParsedValue {
+        var count: usize = 0;
+        {
+            var it = std.mem.splitScalar(u8, raw, separator);
+            while (it.next()) |part| {
+                if (std.mem.trim(u8, part, " ").len > 0) count += 1;
+            }
+        }
+
+        const raw_buf = try self.allocator.alloc(u8, count * @sizeOf([]const u8));
+        errdefer self.allocator.free(raw_buf);
+
+        const buf: [][]const u8 = @ptrCast(@alignCast(raw_buf));
+
+        var idx: usize = 0;
+        var it = std.mem.splitScalar(u8, raw, separator);
+        while (it.next()) |part| {
+            const trimmed = std.mem.trim(u8, part, " ");
+            if (trimmed.len > 0) {
+                buf[idx] = try self.copyAndTrackSlice(result, trimmed);
+                idx += 1;
+            }
+        }
+
+        try result.ownSlice(raw_buf);
+        return .{ .array = buf[0..count] };
     }
 
     fn validateRequired(self: *Parser, result: *ParseResult) !void {
@@ -1465,4 +1499,58 @@ test "Parser validates positional choices" {
         const argv = [_][]const u8{"staging"};
         try std.testing.expectError(errors.ParseError.InvalidChoice, parser.parse(&argv));
     }
+}
+
+test "Parser array value with separator" {
+    const allocator = std.testing.allocator;
+    config_mod.initConfig(.{ .exit_on_error = false });
+    defer config_mod.resetConfig();
+
+    const spec = CommandSpec{
+        .name = "test",
+        .add_help = false,
+        .args = &[_]ArgSpec{
+            .{ .name = "hosts", .long = "hosts", .value_type = .array, .separator = ',' },
+        },
+    };
+
+    var parser = try Parser.init(allocator, spec, defaultIo(), null);
+    defer parser.deinit();
+
+    const args = [_][]const u8{ "--hosts", "a,b,c" };
+    var result = try parser.parse(&args);
+    defer result.deinit();
+
+    const arr = result.getArray("hosts").?;
+    try std.testing.expectEqual(@as(usize, 3), arr.len);
+    try std.testing.expectEqualStrings("a", arr[0]);
+    try std.testing.expectEqualStrings("b", arr[1]);
+    try std.testing.expectEqualStrings("c", arr[2]);
+}
+
+test "Parser array value with separator via inline" {
+    const allocator = std.testing.allocator;
+    config_mod.initConfig(.{ .exit_on_error = false, .allow_inline_values = true });
+    defer config_mod.resetConfig();
+
+    const spec = CommandSpec{
+        .name = "test",
+        .add_help = false,
+        .args = &[_]ArgSpec{
+            .{ .name = "hosts", .long = "hosts", .value_type = .array, .separator = ',' },
+        },
+    };
+
+    var parser = try Parser.init(allocator, spec, defaultIo(), null);
+    defer parser.deinit();
+
+    const args = [_][]const u8{"--hosts=a,b,c"};
+    var result = try parser.parse(&args);
+    defer result.deinit();
+
+    const arr = result.getArray("hosts").?;
+    try std.testing.expectEqual(@as(usize, 3), arr.len);
+    try std.testing.expectEqualStrings("a", arr[0]);
+    try std.testing.expectEqualStrings("b", arr[1]);
+    try std.testing.expectEqualStrings("c", arr[2]);
 }

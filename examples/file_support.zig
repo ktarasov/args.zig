@@ -2,8 +2,7 @@ const std = @import("std");
 const args = @import("args");
 
 pub fn main(init: std.process.Init) !void {
-    _ = init;
-    const allocator = std.heap.c_allocator;
+    const allocator = init.arena.allocator();
 
     var parser = try args.ArgumentParser.init(allocator, .{
         .name = "file-support",
@@ -44,3 +43,5 @@ pub fn main(init: std.process.Init) !void {
     std.debug.print("workspace: {s}\n", .{parsed.getString("workspace") orelse "<missing>"});
     std.debug.print("output-name: {s}\n", .{parsed.getString("output-name") orelse "<missing>"});
 }
+
+

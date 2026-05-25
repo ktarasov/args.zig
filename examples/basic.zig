@@ -6,7 +6,7 @@ const args = @import("args");
 
 pub fn main(init: std.process.Init) !void {
     // Setup allocator
-    const allocator = std.heap.c_allocator;
+    const allocator = init.arena.allocator();
 
     // Create argument parser
     var parser = try args.ArgumentParser.init(allocator, .{
@@ -109,3 +109,4 @@ pub fn main(init: std.process.Init) !void {
         }
     }
 }
+

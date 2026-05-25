@@ -4,7 +4,7 @@ const std = @import("std");
 const args = @import("args");
 
 pub fn main(init: std.process.Init) !void {
-    const allocator = std.heap.c_allocator;
+    const allocator = init.arena.allocator();
 
     var parser = try args.ArgumentParser.init(allocator, .{
         .name = "key-value-demo",
@@ -35,3 +35,4 @@ pub fn main(init: std.process.Init) !void {
     }
     result.deinit();
 }
+

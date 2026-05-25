@@ -73,14 +73,13 @@ pub fn build(b: *std.Build) void {
 
 ## Your First Parser
 
-Create a simple command-line application:
+Create a simple command-line application with the **basic API** and process initialization context:
 
 ```zig
 const std = @import("std");
 const args = @import("args");
 
 pub fn main(init: std.process.Init) !void {
-    // Setup allocator
     const allocator = init.arena.allocator();
 
     // Create parser
@@ -103,7 +102,7 @@ pub fn main(init: std.process.Init) !void {
         .help = "Add excitement to greeting",
     });
 
-    // Parse arguments
+    // Parse arguments from the current process
     var result = try parser.parseProcess(init);
     defer result.deinit();
 
@@ -118,6 +117,75 @@ pub fn main(init: std.process.Init) !void {
     }
 }
 ```
+
+> [!NOTE]
+> ## Understanding `std.process.Init` (Zig 0.16)
+>
+> In Zig 0.16, the `main` function signature changed to `pub fn main(init: std.process.Init) !void`.
+>
+> `std.process.Init` provides access to:
+> - **`init.arena.allocator()`** — A scoped arena allocator tied to the process lifetime. Use this as your primary allocator; it is freed automatically on exit.
+> - **`init.minimal.args`** — The process command-line arguments, exposed through Zig's minimal startup state.
+> - **`init.io`** — A `std.Io` instance for the process, suitable for stdin, stdout, stderr, and other I/O work.
+> - **`init.environ_map`** — The process environment map, which lets args.zig resolve environment-backed options automatically.
+>
+> Always pass `init` to `parser.parseProcess(init)` when you want the parser to use the process args, I/O context, and environment map directly. Use `parser.parse(&[_][]const u8{...})` when you need a custom argument list in tests, tools, or examples.
+
+### Advanced: Using std.process.Init
+
+For applications that need full control over process initialization:
+
+```zig
+const std = @import("std");
+const args = @import("args");
+
+pub fn main(init: std.process.Init) !void {
+    // Setup allocator (from process init)
+    const allocator = init.arena.allocator();
+
+    // Create parser
+    var parser = try args.ArgumentParser.init(allocator, .{
+        .name = "greet",
+        .version = "1.0.0",
+        .description = "A friendly greeting application",
+    });
+    defer parser.deinit();
+
+    // Add arguments
+    try parser.addOption("name", .{
+        .short = 'n',
+        .help = "Name to greet",
+        .default = "World",
+    });
+
+    try parser.addFlag("excited", .{
+        .short = 'e',
+        .help = "Add excitement to greeting",
+    });
+
+    // Parse arguments with full process context
+    var result = try parser.parseProcess(init);
+    defer result.deinit();
+
+    // Use the results
+    const name = result.getString("name") orelse "World";
+    const excited = result.getBool("excited") orelse false;
+
+    if (excited) {
+        std.debug.print("Hello, {s}!!!\n", .{name});
+    } else {
+        std.debug.print("Hello, {s}.\n", .{name});
+    }
+}
+```
+
+### What You Get From `std.process.Init`
+
+- **Process lifetime allocation** - `init.arena.allocator()` is ideal for one-shot CLI programs
+- **Startup arguments** - `init.minimal.args` gives `args.zig` the exact command-line input from Zig's runtime
+- **Process I/O** - `init.io` keeps parsing, help text, and related output aligned with the active process streams
+- **Environment variables** - `init.environ_map` enables automatic env-var fallback when you configure `env_prefix` or `env_var`
+- **One-liner parsing** - `parser.parseProcess(init)` is the simplest and most future-proof path for Zig 0.16+
 
 ## Running Your App
 

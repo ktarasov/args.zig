@@ -15,7 +15,7 @@ fn onOutput(name: []const u8, value: ?[]const u8) void {
 }
 
 pub fn main(init: std.process.Init) !void {
-    const allocator = std.heap.c_allocator;
+    const allocator = init.arena.allocator();
 
     var parser = try args.ArgumentParser.init(allocator, .{
         .name = "callback-demo",
@@ -57,3 +57,4 @@ pub fn main(init: std.process.Init) !void {
     }
     result.deinit();
 }
+

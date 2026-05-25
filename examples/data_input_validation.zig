@@ -2,7 +2,7 @@ const std = @import("std");
 const args = @import("args");
 
 pub fn main(init: std.process.Init) !void {
-    const allocator = std.heap.c_allocator;
+    const allocator = init.arena.allocator();
 
     var parser = try args.ArgumentParser.init(allocator, .{
         .name = "data-input-validation",
@@ -108,3 +108,4 @@ pub fn main(init: std.process.Init) !void {
     std.debug.print("payload: {s}\n", .{parsed.getString("payload") orelse "<missing>"});
     std.debug.print("retries: {d}\n", .{parsed.getInt("retries") orelse 0});
 }
+

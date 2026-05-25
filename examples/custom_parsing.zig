@@ -43,7 +43,7 @@ fn validateMode(io: std.Io, text: []const u8) args.validation.ValidationResult {
 }
 
 pub fn main(init: std.process.Init) !void {
-    const allocator = std.heap.c_allocator;
+    const allocator = init.arena.allocator();
 
     var parser = try args.ArgumentParser.init(allocator, .{
         .name = "screen-tool",
@@ -98,3 +98,4 @@ pub fn main(init: std.process.Init) !void {
     }
     result.deinit();
 }
+

@@ -35,13 +35,20 @@ pub fn build(b: *std.Build) void {
         .{ .name = "key_value", .path = "examples/key_value.zig" },
         .{ .name = "struct_demo", .path = "examples/struct_demo.zig" },
         .{ .name = "expect_validation", .path = "examples/expect_validation.zig" },
+        .{ .name = "int_float_options", .path = "examples/int_float_options.zig" },
+        .{ .name = "hex_option", .path = "examples/hex_option.zig" },
+        .{ .name = "log_level", .path = "examples/log_level.zig" },
+        .{ .name = "advanced_struct", .path = "examples/advanced_struct.zig" },
+        .{ .name = "env_var_config", .path = "examples/env_var_config.zig" },
+        .{ .name = "list_option", .path = "examples/list_option.zig" },
+        .{ .name = "validation_demo", .path = "examples/validation_demo.zig" },
         .{ .name = "update_check", .path = "examples/update_check.zig", .skip_run_all = true },
     };
 
     // Create run-all-examples step that runs all examples sequentially
     const run_all_examples = b.step("run-all-examples", "Run all examples sequentially");
-    var previous_run_step: ?*std.Build.Step = null;
 
+    // Build examples in smaller batches to avoid OOM
     inline for (examples) |example| {
         const exe = b.addExecutable(.{
             .name = example.name,
@@ -66,27 +73,14 @@ pub fn build(b: *std.Build) void {
         // Add run step for each example
         const run_exe = b.addRunArtifact(exe);
         run_exe.step.dependOn(&install_exe.step);
-        // Examples might need args to not fail or wait for input, adding --help is safe
         run_exe.addArg("--help");
 
         const run_step = b.step("run-" ++ example.name, "Run " ++ example.name ++ " example");
         run_step.dependOn(&run_exe.step);
 
         if (!example.skip_run_all) {
-            // Re-use the same executable artifact for run-all sequence
-            const run_all_exe = b.addRunArtifact(exe);
-            run_all_exe.addArg("--help");
-
-            // Make each run step depend on the previous run step to ensure sequential execution
-            if (previous_run_step) |prev| {
-                run_all_exe.step.dependOn(prev);
-            }
-            previous_run_step = &run_all_exe.step;
+            run_all_examples.dependOn(run_step);
         }
-    }
-
-    if (previous_run_step) |last| {
-        run_all_examples.dependOn(last);
     }
 
     // Unit tests

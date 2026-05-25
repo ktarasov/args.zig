@@ -113,7 +113,15 @@ args.zig also provides reusable validators for common app and API inputs:
 - `Validators.json`
 - `Validators.absolutePath`
 - `Validators.intRange(min, max)`
+- `Validators.uintRange(min, max)`
 - `Validators.floatRange(min, max)`
+- `Validators.hexColor` / `Validators.hexColour` — validates hex color codes (`#RGB`, `#RRGGBB`, `#RGBA`, `#RRGGBBAA`)
+- `Validators.semver` — validates semantic version strings (`MAJOR.MINOR.PATCH`)
+- `Validators.base64` — validates base64 encoded strings
+- `Validators.macAddress` / `Validators.mac` — validates MAC addresses (`XX:XX:XX:XX:XX:XX` or `XX-XX-XX-XX-XX-XX`)
+- `Validators.asciiOnly` — validates that a string contains only ASCII characters
+- `Validators.lowercase` — validates that a string is all lowercase
+- `Validators.uppercase` — validates that a string is all uppercase
 
 You can use them directly:
 

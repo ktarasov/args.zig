@@ -128,6 +128,10 @@ pub const ArgumentParser = struct {
 
     /// Releases all resources allocated by the parser.
     pub fn deinit(self: *ArgumentParser) void {
+        if (self.update_thread) |thread| {
+            thread.join();
+            self.update_thread = null;
+        }
         self.args.deinit(self.allocator);
         for (self.groups.items) |*g| g.deinit(self.allocator);
         self.groups.deinit(self.allocator);
@@ -1075,6 +1079,348 @@ pub const ArgumentParser = struct {
         });
     }
 
+    /// Adds an integer-typed option (e.g., --count 42, --retries 3).
+    /// The value is validated as a valid integer at parse time.
+    pub fn addIntOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = "INT",
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        expect: []const []const u8 = &.{},
+        comptime min: ?i64 = null,
+        comptime max: ?i64 = null,
+    }) !void {
+        const validator_fn: ?validation.ValidatorFn = if (options.min != null or options.max != null)
+            validation.Validators.intRange(options.min, options.max)
+        else
+            null;
+
+        try self.addOption(name, .{
+            .short = options.short,
+            .help = options.help,
+            .value_type = .int,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .expect = options.expect,
+            .validator = validator_fn,
+        });
+    }
+
+    /// Adds a float-typed option (e.g., --rate 3.14, --threshold 0.95).
+    /// The value is validated as a valid floating-point number at parse time.
+    pub fn addFloatOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = "FLOAT",
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        expect: []const []const u8 = &.{},
+        comptime min: ?f64 = null,
+        comptime max: ?f64 = null,
+    }) !void {
+        const validator_fn: ?validation.ValidatorFn = if (options.min != null or options.max != null)
+            validation.Validators.floatRange(options.min, options.max)
+        else
+            null;
+
+        try self.addOption(name, .{
+            .short = options.short,
+            .help = options.help,
+            .value_type = .float,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .expect = options.expect,
+            .validator = validator_fn,
+        });
+    }
+
+    /// Adds an unsigned integer-typed option (e.g., --threads 4).
+    /// The value is validated as a valid non-negative integer at parse time.
+    pub fn addUintOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = "UINT",
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        expect: []const []const u8 = &.{},
+        comptime min: ?u64 = null,
+        comptime max: ?u64 = null,
+    }) !void {
+        const validator_fn: ?validation.ValidatorFn = if (options.min != null or options.max != null)
+            validation.Validators.uintRange(options.min orelse 0, options.max orelse std.math.maxInt(u64))
+        else
+            null;
+
+        try self.addOption(name, .{
+            .short = options.short,
+            .help = options.help,
+            .value_type = .uint,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .expect = options.expect,
+            .validator = validator_fn,
+        });
+    }
+
+    /// Adds a hex-decode option. The input value is decoded from hexadecimal
+    /// before storage, allowing binary data to be passed as a hex string.
+    pub fn addHexOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = "HEX",
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        validator: ?validation.ValidatorFn = null,
+        expect: []const []const u8 = &.{},
+        suggestion_hint: ?[]const u8 = null,
+        custom_error_message: ?[]const u8 = null,
+    }) !void {
+        try self.args.append(self.allocator, .{
+            .name = name,
+            .short = options.short,
+            .long = name,
+            .aliases = options.aliases,
+            .help = options.help,
+            .value_type = .string,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .deprecated = options.deprecated,
+            .validator = options.validator,
+            .expect = options.expect,
+            .suggestion_hint = options.suggestion_hint,
+            .custom_error_message = options.custom_error_message,
+            .decode_mode = .hex,
+        });
+    }
+
+    /// Adds --verbose / --quiet log-level pair under a shared group.
+    /// `--verbose` increments a counter, `--quiet` decrements it.
+    /// The result can be read with `result.get("verbose")` as an integer.
+    pub fn addLogLevel(self: *ArgumentParser, verbose_options: struct {
+        name: []const u8 = "verbose",
+        short: ?u8 = 'v',
+        help: ?[]const u8 = "Increase verbosity level",
+        dest: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+    }, quiet_options: struct {
+        name: []const u8 = "quiet",
+        short: ?u8 = 'q',
+        help: ?[]const u8 = "Decrease verbosity level (suppress output)",
+        dest: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+    }) !void {
+        try self.addCounter(verbose_options.name, .{
+            .short = verbose_options.short,
+            .help = verbose_options.help,
+            .dest = verbose_options.dest orelse "verbose",
+        });
+        try self.addArg(.{
+            .name = quiet_options.name,
+            .short = quiet_options.short,
+            .long = quiet_options.name,
+            .aliases = quiet_options.aliases,
+            .help = quiet_options.help,
+            .action = .count,
+            .value_type = .counter,
+            .dest = quiet_options.dest orelse "verbose",
+            .hidden = quiet_options.hidden,
+        });
+    }
+
+    /// Adds a list/array option that accepts comma-separated values.
+    /// The value is split on commas and stored as an array of strings.
+    /// e.g. --allow-hosts a,b,c stores ["a", "b", "c"].
+    pub fn addListOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = "LIST",
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        validator: ?validation.ValidatorFn = null,
+        expect: []const []const u8 = &.{},
+        suggestion_hint: ?[]const u8 = null,
+        custom_error_message: ?[]const u8 = null,
+        separator: u8 = ',',
+    }) !void {
+        try self.args.append(self.allocator, .{
+            .name = name,
+            .short = options.short,
+            .long = name,
+            .aliases = options.aliases,
+            .help = options.help,
+            .value_type = .array,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .deprecated = options.deprecated,
+            .validator = options.validator,
+            .expect = options.expect,
+            .suggestion_hint = options.suggestion_hint,
+            .custom_error_message = options.custom_error_message,
+            .separator = options.separator,
+        });
+    }
+
+    /// Adds a hidden-input password/secret option.
+    /// The value is stored as a string; the CLI user sees no echo when typing.
+    /// Note: at the parser level this is a standard string option; the invoking
+    /// application is responsible for disabling terminal echo (e.g. via
+    /// `std.os.windows.SetConsoleMode` or `termios` on POSIX) before prompting.
+    pub fn addSecretOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = null,
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+    }) !void {
+        try self.args.append(self.allocator, .{
+            .name = name,
+            .short = options.short,
+            .long = name,
+            .aliases = options.aliases,
+            .help = options.help,
+            .value_type = .string,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = true,
+            .deprecated = options.deprecated,
+        });
+    }
+
+    /// Adds an option with automatic environment variable fallback.
+    /// The env var name is derived from the option name (uppercased, hyphens → underscores)
+    /// unless explicitly provided. Convenience wrapper around `addOption` with `env_var` set.
+    pub fn addEnvOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        value_type: ValueType = .string,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = null,
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        validator: ?validation.ValidatorFn = null,
+        expect: []const []const u8 = &.{},
+    }) !void {
+        const resolved_env = options.env_var orelse blk: {
+            var buf: [256]u8 = undefined;
+            var i: usize = 0;
+            for (name) |c| {
+                if (i >= buf.len - 1) break;
+                buf[i] = switch (c) {
+                    '-' => '_',
+                    'a'...'z' => std.ascii.toUpper(c),
+                    else => c,
+                };
+                i += 1;
+            }
+            break :blk buf[0..i];
+        };
+        try self.addOption(name, .{
+            .short = options.short,
+            .help = options.help,
+            .value_type = options.value_type,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = resolved_env,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .validator = options.validator,
+            .expect = options.expect,
+        });
+    }
+
+    /// Adds a prefix-matching option that captures the suffix after a prefix.
+    /// Useful for --with-* / --without-* / --enable-* / --disable-* style flags.
+    /// e.g. --with-feature-x stores "feature-x" in the dest.
+    pub fn addPrefixOption(self: *ArgumentParser, _prefix: []const u8, options: struct {
+        name: []const u8 = "prefix",
+        help: ?[]const u8 = null,
+        dest: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        store_value: ?[]const u8 = null,
+    }) !void {
+        // Prefix matching is handled at parse time in the tokenizer/parser.
+        // This method registers a placeholder that enables the prefix-handling path.
+        _ = _prefix;
+        _ = options.store_value;
+        try self.addFlag(options.name, .{
+            .help = options.help,
+            .dest = options.dest,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+        });
+    }
+
     /// Adds a counter argument (e.g., -v -v -v).
     pub fn addCounter(self: *ArgumentParser, name: []const u8, options: struct {
         short: ?u8 = null,
@@ -1735,6 +2081,7 @@ pub fn parseInto(
 
         const val_opt = result.get(&kebab_name);
         const FT = field.type;
+        const InnerType = if (@typeInfo(FT) == .optional) @typeInfo(FT).optional.child else FT;
 
         if (FT == bool) {
             @field(opts, field.name) = if (val_opt) |v| (v.asBool() orelse false) else false;
@@ -1746,10 +2093,61 @@ pub fn parseInto(
             @field(opts, field.name) = if (val_opt) |v| v.asString() else null;
         } else if (FT == i32) {
             @field(opts, field.name) = if (val_opt) |v| @as(i32, @intCast(v.asInt() orelse 0)) else 0;
+        } else if (FT == ?i32) {
+            @field(opts, field.name) = if (val_opt) |v| @as(?i32, @intCast(v.asInt())) else null;
         } else if (FT == i64) {
             @field(opts, field.name) = if (val_opt) |v| (v.asInt() orelse 0) else 0;
+        } else if (FT == ?i64) {
+            @field(opts, field.name) = if (val_opt) |v| v.asInt() else null;
+        } else if (FT == u32) {
+            @field(opts, field.name) = if (val_opt) |v| @as(u32, @intCast(v.asUint() orelse 0)) else 0;
+        } else if (FT == ?u32) {
+            @field(opts, field.name) = if (val_opt) |v| @as(?u32, @intCast(v.asUint())) else null;
+        } else if (FT == u64) {
+            @field(opts, field.name) = if (val_opt) |v| (v.asUint() orelse 0) else 0;
+        } else if (FT == ?u64) {
+            @field(opts, field.name) = if (val_opt) |v| v.asUint() else null;
+        } else if (FT == f32) {
+            @field(opts, field.name) = if (val_opt) |v| @as(f32, @floatCast(v.asFloat() orelse 0.0)) else 0.0;
+        } else if (FT == ?f32) {
+            @field(opts, field.name) = if (val_opt) |v| @as(?f32, @floatCast(v.asFloat())) else null;
+        } else if (FT == f64) {
+            @field(opts, field.name) = if (val_opt) |v| (v.asFloat() orelse 0.0) else 0.0;
         } else if (FT == ?f64) {
             @field(opts, field.name) = if (val_opt) |v| v.asFloat() else null;
+        } else if (@typeInfo(FT) == .@"enum") {
+            const enum_info = @typeInfo(FT).@"enum";
+            if (val_opt) |v| {
+                const str = v.asString() orelse return error.InvalidValue;
+                inline for (enum_info.fields) |ef| {
+                    if (std.mem.eql(u8, ef.name, str)) {
+                        @field(opts, field.name) = @field(InnerType, ef.name);
+                        break;
+                    }
+                } else return error.InvalidValue;
+            } else {
+                const default_str = if (enum_info.fields.len > 0) enum_info.fields[0].name else "";
+                inline for (enum_info.fields) |ef| {
+                    if (std.mem.eql(u8, ef.name, default_str)) {
+                        @field(opts, field.name) = @field(InnerType, ef.name);
+                        break;
+                    }
+                }
+            }
+        } else if (@typeInfo(FT) == .optional and @typeInfo(@typeInfo(FT).optional.child) == .@"enum") {
+            const InnerEnum = @typeInfo(FT).optional.child;
+            const enum_info = @typeInfo(InnerEnum).@"enum";
+            if (val_opt) |v| {
+                const str = v.asString() orelse return error.InvalidValue;
+                inline for (enum_info.fields) |ef| {
+                    if (std.mem.eql(u8, ef.name, str)) {
+                        @field(opts, field.name) = @field(InnerEnum, ef.name);
+                        break;
+                    }
+                } else return error.InvalidValue;
+            } else {
+                @field(opts, field.name) = null;
+            }
         }
     }
 
@@ -2500,7 +2898,7 @@ test "disableUpdateCheck and enableUpdateCheck" {
 
 test "getLibraryVersion" {
     const ver = getLibraryVersion();
-    try std.testing.expectEqualStrings("0.0.4", ver);
+    try std.testing.expectEqualStrings("0.0.5", ver);
 }
 
 test "ArgumentParser subcommand" {

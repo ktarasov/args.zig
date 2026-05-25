@@ -20,7 +20,7 @@ const Config = struct {
 };
 
 pub fn main(init: std.process.Init) !void {
-    const allocator = std.heap.c_allocator;
+    const allocator = init.arena.allocator();
 
     // Note: We use parseInto which calls parseProcess internally for this example.
     var parsed = args.parseInto(allocator, Config, .{
@@ -46,3 +46,4 @@ pub fn main(init: std.process.Init) !void {
         std.debug.print("  Timeout: {d:.2}s\n", .{t});
     }
 }
+

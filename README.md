@@ -33,6 +33,15 @@ A production-grade, high-performance command-line argument parsing library for Z
 > **args.zig is a relatively new project**, but it is designed and tested with production use in mind.
 > The API is intended to be stable, and the library focuses on performance, correctness, and real-world CLI needs.
 
+
+**Related Zig projects:**
+
+- For **API framework** support, check out **[api.zig](https://github.com/muhammad-fiaz/api.zig)**.
+- For **web framework** support, check out **[zix](https://github.com/muhammad-fiaz/zix)**.
+- For **logging** support, check out **[logly.zig](https://github.com/muhammad-fiaz/logly.zig)**.
+- For **data validation and serialization** support, check out **[zigantic](https://github.com/muhammad-fiaz/zigantic)**.
+- For **HTTP Server/Client** support, check out **[httpx.zig](https://github.com/muhammad-fiaz/httpx.zig)**.
+
 ⭐ **If you love `args.zig`, make sure to give it a star!**
 
 ## Features
@@ -56,8 +65,19 @@ A production-grade, high-performance command-line argument parsing library for Z
 - [**Include/Exclude Filters**](https://muhammad-fiaz.github.io/args.zig/guide/options-flags#includeexclude-filters) - Reusable `--include` and `--exclude` helpers for CMD workflows
 - [**Strict Filter Resolution**](https://muhammad-fiaz.github.io/args.zig/guide/options-flags#strict-includeexclude-resolution) - Canonicalize choices, dedupe values, and detect include/exclude conflicts
 - [**File & Extension Support**](https://muhammad-fiaz.github.io/args.zig/guide/options-flags#file-and-extension-support) - Reusable helpers for file paths, directories, and allowed extensions
+- [**Typed Numeric Options**](https://muhammad-fiaz.github.io/args.zig/api/parser#numeric-typed-option-helpers) - `addIntOption`, `addFloatOption`, `addUintOption` with optional range validation
+- [**Hex Decode Option**](https://muhammad-fiaz.github.io/args.zig/api/parser#decode--encoding-option-helpers) - `addHexOption` for passing binary data as hex strings
+- [**Log Level Helpers**](https://muhammad-fiaz.github.io/args.zig/api/parser#addloglevel) - Integrated `--verbose` / `--quiet` pair via `addLogLevel`
+- [**Advanced parseInto**](https://muhammad-fiaz.github.io/args.zig/examples/#advanced-parseinto-example) - Struct parsing with enums, u32, u64, f32, f64, and optional fields
+- [**ENV Var Configuration**](https://muhammad-fiaz.github.io/args.zig/guide/environment-variables) - `fromEnvOrDefault` helper and `env_prefix` for automatic env-var derivation
 - [**Typed Input Validators**](https://muhammad-fiaz.github.io/args.zig/guide/validation#typed-input-validators) - Built-in validators for email, URL, IPv4, hostname/port endpoints, UUID, ISO dates, year/time, JSON payloads, and absolute paths
+- [**Error Formatting Helpers**](https://muhammad-fiaz.github.io/args.zig/api/errors) - Shared message formatters for parse, schema, and validation errors
 - [**CSV Select/All Resolution**](https://muhammad-fiaz.github.io/args.zig/guide/options-flags#csv-selectall-strict-resolution) - Resolve `--select users,groups` and `--all` into normalized target sets
+- [**List Options**](https://muhammad-fiaz.github.io/args.zig/api/parser#addlistoption) - Comma-separated list values stored as arrays via `addListOption`
+- [**Secret Options**](https://muhammad-fiaz.github.io/args.zig/api/parser#addsecretoption) - Password/secret options hidden from help text
+- [**Extra Validators**](https://muhammad-fiaz.github.io/args.zig/guide/validation) - `hexColor`, `semver`, `base64`, `macAddress`, `asciiOnly`, `lowercase`, `uppercase`
+- [**ParseResult Extras**](https://muhammad-fiaz.github.io/args.zig/api/parser#parsersult) - `getUint`, `getArray`, `getEnum`, `getOrString`, `getOrInt`, `getOrBool`, `getOrFloat`, `getOrUint` methods on `ParseResult`
+- [**Env Options**](https://muhammad-fiaz.github.io/args.zig/api/parser#addenvoption) - Automatic env var derivation via `addEnvOption`
 - [**Well Tested**](CONTRIBUTING.md#running-tests) - Extensive test coverage across all modules
 
 
@@ -98,6 +118,8 @@ exe.root_module.addImport("args", args_dep.module("args"));
 
 ## Quick Start
 
+### Basic Example
+
 ```zig
 const std = @import("std");
 const args = @import("args");
@@ -129,7 +151,7 @@ pub fn main(init: std.process.Init) !void {
         .help = "Input file to process",
     });
 
-    // Parse command-line arguments
+    // Parse command-line arguments from the process init context
     var result = try parser.parseProcess(init);
     defer result.deinit();
 
@@ -143,6 +165,49 @@ pub fn main(init: std.process.Init) !void {
     }
 }
 ```
+
+> [!NOTE]
+> ### Understanding `std.process.Init` (Zig 0.16+)
+>
+> In Zig 0.16, the main function signature changed to `pub fn main(init: std.process.Init) !void`.
+> The `init` parameter gives you the full process context used by `args.zig`:
+>
+> - **`init.arena.allocator()`** — Arena allocator for the process lifetime, freed automatically on exit
+> - **`init.minimal.args`** — Command-line arguments as Zig sees them at startup
+> - **`init.io`** — I/O context for stdin, stdout, and stderr
+> - **`init.environ_map`** — Environment variables for process-aware parsing
+>
+> This is the recommended path for Zig 0.16+ because `parser.parseProcess(init)` can use the process args, I/O, and environment map directly.
+
+### Alternative: Using c_allocator (Simpler but requires libc)
+
+If you prefer not to use `std.process.Init`, you can use `c_allocator`:
+
+```zig
+pub fn main() !void {
+    const allocator = std.heap.c_allocator;
+    
+    var parser = try args.ArgumentParser.init(allocator, .{ .name = "myapp" });
+    defer parser.deinit();
+    
+    // Add arguments...
+    
+    // Parse with explicit args
+    const argv = try std.process.argsAlloc(allocator);
+    defer std.process.argsFree(allocator, argv);
+    
+    var result = try parser.parse(argv[1..]);
+    defer result.deinit();
+}
+```
+
+### Feature Highlights for Zig 0.16+
+
+- **Process-aware parsing** - `parseProcess(init)` reads from `init.minimal.args`, `init.io`, and `init.environ_map`
+- **Arena-backed allocation** - `init.arena.allocator()` is ideal for CLI apps that exit once and free everything automatically
+- **Explicit parsing fallback** - `parser.parse(...)` still works when you want to supply custom arguments in tests or tooling
+- **I/O-aware runtime behavior** - parse and help output can use the process I/O context cleanly
+- **Environment-driven configuration** - combine `env_prefix` and `env_var` with `init.environ_map` for automatic env lookups
 
 ## Examples
 
@@ -488,6 +553,111 @@ var parsed = try args.parseInto(allocator, Config, .{
 defer parsed.deinit();
 
 std.debug.print("Count: {d}\n", .{parsed.options.count});
+```
+
+### Typed Numeric Options
+
+Use `addIntOption`, `addFloatOption`, and `addUintOption` for type-safe numeric parsing with optional range validation:
+
+```zig
+try parser.addIntOption("retries", .{
+    .short = 'r',
+    .help = "Retry count",
+    .default = "3",
+});
+
+try parser.addFloatOption("threshold", .{
+    .short = 't',
+    .help = "Confidence threshold",
+    .default = "0.75",
+});
+
+try parser.addUintOption("threads", .{
+    .short = 'p',
+    .help = "Worker thread count (1-64)",
+    .default = "4",
+    .min = 1,    // Minimum value
+    .max = 64,   // Maximum value
+});
+```
+
+### Hex Decode Option
+
+Pass binary data as hex strings — useful for keys, hashes, and small payloads:
+
+```zig
+try parser.addHexOption("key", .{
+    .short = 'k',
+    .help = "Hex-encoded key material",
+    .required = true,
+});
+
+var result = try parser.parseProcess(init);
+defer result.deinit();
+
+const key_bytes = result.get("key").?.asString().?; // Decoded bytes
+```
+
+### Log Level Helpers
+
+The `addLogLevel` helper wires `--verbose` (increments) and `--quiet` (decrements) to a shared counter:
+
+```zig
+try parser.addLogLevel(
+    .{ .short = 'v', .dest = "verbosity" },
+    .{ .short = 'q', .dest = "verbosity" },
+);
+
+var result = try parser.parseProcess(init);
+defer result.deinit();
+
+const level = result.get("verbosity").?.asInt().? orelse 0; // -v -v => 2; -q => -1
+```
+
+### Advanced parseInto with Enums
+
+Enum struct fields are automatically converted to `--flag` choices:
+
+```zig
+const LogLevel = enum { debug, info, warn, err };
+
+const Config = struct {
+    verbose: bool = false,
+    log_level: LogLevel = .info,
+    port: u32 = 8080,
+    timeout: f64 = 30.0,
+    host: []const u8 = "localhost",
+};
+
+var parsed = try args.parseInto(allocator, Config, .{
+    .name = "myapp",
+}, null, init);
+defer parsed.deinit();
+
+std.debug.print("Log level: {s}\n", .{@tagName(parsed.options.log_level)});
+```
+
+### Environment Variable Configuration
+
+Use `env_var`, `env_prefix` config, and `fromEnvOrDefault` for flexible configuration:
+
+```zig
+var parser = try args.ArgumentParser.init(allocator, .{
+    .name = "app",
+    // Auto-derives env vars: MYAPP_DB_HOST, MYAPP_DB_PORT, etc.
+    .config = args.Config{ .env_prefix = "MYAPP" },
+});
+
+try parser.addOption("db-host", .{
+    .short = 'h',
+    .env_var = "MYAPP_DB_HOST",  // Explicit env var
+    .default = "localhost",
+});
+
+// Explicit env var with fallback default
+try parser.fromEnvOrDefault("api-key", "MYAPP_API_KEY", "no-key-set", .{
+    .help = "API key (from MYAPP_API_KEY env var)",
+});
 ```
 
 

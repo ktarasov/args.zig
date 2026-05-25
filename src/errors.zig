@@ -90,26 +90,64 @@ pub const levenshteinDistance = utils.editDistance;
 pub const findClosestMatch = utils.findClosest;
 
 /// Format a parse error for display.
-pub fn formatParseError(err: ParseError) []const u8 {
+pub fn formatParseError(err: anyerror) []const u8 {
     return switch (err) {
-        ParseError.UnknownOption => "unknown option",
-        ParseError.MissingRequired => "missing required argument",
-        ParseError.MissingValue => "missing value for option",
-        ParseError.InvalidValue => "invalid value",
-        ParseError.TooManyValues => "too many values provided",
-        ParseError.TooFewValues => "too few values provided",
-        ParseError.InvalidChoice => "invalid choice",
-        ParseError.ConflictingArguments => "conflicting arguments",
-        ParseError.MissingDependency => "missing required dependency",
-        ParseError.DuplicateArgument => "duplicate argument",
-        ParseError.InvalidFormat => "invalid argument format",
-        ParseError.UnexpectedPositional => "unexpected positional argument",
-        ParseError.UnknownSubcommand => "unknown subcommand",
-        ParseError.MissingSubcommand => "missing subcommand",
-        ParseError.MutuallyExclusive => "mutually exclusive arguments used together",
-        ParseError.OutOfMemory => "out of memory",
-        ParseError.Overflow => "numeric overflow",
-        ParseError.InvalidCharacter => "invalid character in value",
+        error.UnknownOption => "unknown option",
+        error.MissingRequired => "missing required argument",
+        error.MissingValue => "missing value for option",
+        error.InvalidValue => "invalid value",
+        error.TooManyValues => "too many values provided",
+        error.TooFewValues => "too few values provided",
+        error.InvalidChoice => "invalid choice",
+        error.ConflictingArguments => "conflicting arguments",
+        error.MissingDependency => "missing required dependency",
+        error.DuplicateArgument => "duplicate argument",
+        error.InvalidFormat => "invalid argument format",
+        error.UnexpectedPositional => "unexpected positional argument",
+        error.UnknownSubcommand => "unknown subcommand",
+        error.MissingSubcommand => "missing subcommand",
+        error.MutuallyExclusive => "mutually exclusive arguments used together",
+        error.OutOfMemory => "out of memory",
+        error.Overflow => "numeric overflow",
+        error.InvalidCharacter => "invalid character in value",
+        else => @errorName(err),
+    };
+}
+
+/// Format a schema definition error for display.
+pub fn formatSchemaError(err: SchemaError) []const u8 {
+    return switch (err) {
+        SchemaError.DuplicateArgument => "duplicate argument",
+        SchemaError.InvalidShortName => "invalid short name",
+        SchemaError.InvalidLongName => "invalid long name",
+        SchemaError.MissingName => "missing argument name",
+        SchemaError.EmptyName => "empty argument name",
+        SchemaError.DuplicateName => "duplicate argument name",
+        SchemaError.DuplicateAlias => "duplicate alias",
+        SchemaError.InvalidConfig => "invalid configuration",
+        SchemaError.PositionalAfterVariadic => "positional argument after variadic argument",
+        SchemaError.RequiredAfterOptional => "required argument after optional argument",
+        SchemaError.InvalidNargs => "invalid nargs specification",
+        SchemaError.InvalidDefault => "invalid default value",
+        SchemaError.InvalidChoices => "invalid choices list",
+        SchemaError.CircularDependency => "circular dependency",
+        SchemaError.SelfConflict => "argument conflicts with itself",
+        SchemaError.OutOfMemory => "out of memory",
+    };
+}
+
+/// Format a validation error for display.
+pub fn formatValidationError(err: ValidationError) []const u8 {
+    return switch (err) {
+        ValidationError.OutOfRange => "value out of range",
+        ValidationError.TooShort => "value is too short",
+        ValidationError.TooLong => "value is too long",
+        ValidationError.PatternMismatch => "value does not match required pattern",
+        ValidationError.CustomValidationFailed => "custom validation failed",
+        ValidationError.FileNotFound => "file not found",
+        ValidationError.DirectoryNotFound => "directory not found",
+        ValidationError.PermissionDenied => "permission denied",
+        ValidationError.InvalidPath => "invalid path",
     };
 }
 
@@ -146,4 +184,14 @@ test "ErrorContext.format" {
 test "formatParseError" {
     try std.testing.expectEqualStrings("unknown option", formatParseError(ParseError.UnknownOption));
     try std.testing.expectEqualStrings("missing required argument", formatParseError(ParseError.MissingRequired));
+}
+
+test "formatSchemaError" {
+    try std.testing.expectEqualStrings("duplicate argument", formatSchemaError(SchemaError.DuplicateArgument));
+    try std.testing.expectEqualStrings("invalid long name", formatSchemaError(SchemaError.InvalidLongName));
+}
+
+test "formatValidationError" {
+    try std.testing.expectEqualStrings("value out of range", formatValidationError(ValidationError.OutOfRange));
+    try std.testing.expectEqualStrings("file not found", formatValidationError(ValidationError.FileNotFound));
 }

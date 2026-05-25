@@ -2,8 +2,7 @@ const std = @import("std");
 const args = @import("args");
 
 pub fn main(init: std.process.Init) !void {
-    _ = init;
-    const allocator = std.heap.c_allocator;
+    const allocator = init.arena.allocator();
 
     var parser = try args.ArgumentParser.init(allocator, .{
         .name = "error-handling",
@@ -33,37 +32,42 @@ pub fn main(init: std.process.Init) !void {
 
     const bad_duplicate = [_][]const u8{ "--email", "one@example.com", "--email", "two@example.com" };
     _ = parser.parse(&bad_duplicate) catch |err| {
-        std.debug.print("duplicate example -> {s}\n", .{@errorName(err)});
+        std.debug.print("duplicate example -> {s}\n", .{args.errors.formatParseError(err)});
         return;
     };
 
     const bad_validation = [_][]const u8{ "--email", "ok@example.com", "--port", "70000" };
     _ = parser.parse(&bad_validation) catch |err| {
-        std.debug.print("validation example -> {s}\n", .{@errorName(err)});
+        std.debug.print("validation example -> {s}\n", .{args.errors.formatParseError(err)});
         return;
     };
 
     const bad_choice = [_][]const u8{ "--email", "ok@example.com", "--format", "jsn" };
     _ = parser.parse(&bad_choice) catch |err| {
-        std.debug.print("choice example -> {s}\n", .{@errorName(err)});
+        std.debug.print("choice example -> {s}\n", .{args.errors.formatParseError(err)});
         return;
     };
 
     const unknown_option = [_][]const u8{ "--email", "ok@example.com", "--porrt", "443" };
     _ = parser.parse(&unknown_option) catch |err| {
-        std.debug.print("unknown option example -> {s}\n", .{@errorName(err)});
+        std.debug.print("unknown option example -> {s}\n", .{args.errors.formatParseError(err)});
         return;
     };
 
     const builtin_option_typo = [_][]const u8{ "--email", "ok@example.com", "--verison" };
     _ = parser.parse(&builtin_option_typo) catch |err| {
-        std.debug.print("builtin option typo example -> {s}\n", .{@errorName(err)});
+        std.debug.print("builtin option typo example -> {s}\n", .{args.errors.formatParseError(err)});
         return;
     };
 
     const unknown_subcommand = [_][]const u8{"chcek"};
     _ = parser.parse(&unknown_subcommand) catch |err| {
-        std.debug.print("unknown subcommand example -> {s}\n", .{@errorName(err)});
+        std.debug.print("unknown subcommand example -> {s}\n", .{args.errors.formatParseError(err)});
         return;
     };
+
+    std.debug.print("schema error helper -> {s}\n", .{args.errors.formatSchemaError(error.DuplicateArgument)});
+    std.debug.print("validation error helper -> {s}\n", .{args.errors.formatValidationError(error.InvalidPath)});
 }
+
+

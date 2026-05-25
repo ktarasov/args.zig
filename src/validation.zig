@@ -25,7 +25,21 @@ pub fn decodeValueForMode(allocator: std.mem.Allocator, raw: []const u8, mode: D
         .none => .{ .value = raw },
         .base64_std => try decodeBase64(allocator, raw, false),
         .base64_url_safe => try decodeBase64(allocator, raw, true),
+        .hex => try decodeHex(allocator, raw),
     };
+}
+
+fn decodeHex(allocator: std.mem.Allocator, raw: []const u8) !DecodedValue {
+    if (raw.len % 2 != 0) return error.InvalidValue;
+    const decoded_len = raw.len / 2;
+    const decoded = try allocator.alloc(u8, decoded_len);
+    errdefer allocator.free(decoded);
+    for (0..decoded_len) |i| {
+        const hi = std.fmt.charToDigit(raw[i * 2], 16) catch return error.InvalidValue;
+        const lo = std.fmt.charToDigit(raw[i * 2 + 1], 16) catch return error.InvalidValue;
+        decoded[i] = @as(u8, @intCast(hi * 16 + lo));
+    }
+    return .{ .value = decoded, .owned = decoded };
 }
 
 fn decodeBase64(allocator: std.mem.Allocator, raw: []const u8, url_safe: bool) !DecodedValue {
@@ -378,6 +392,120 @@ pub fn validateIPv6Address(value: []const u8) bool {
     return has_colon;
 }
 
+/// Validates hex color codes (`#RGB`, `#RRGGBB`, `#RGBA`, `#RRGGBBAA`).
+pub fn validateHexColor(value: []const u8) bool {
+    if (value.len < 2 or value[0] != '#') return false;
+    const hex = value[1..];
+    if (hex.len != 3 and hex.len != 4 and hex.len != 6 and hex.len != 8) return false;
+    for (hex) |c| {
+        if (!std.ascii.isHex(c)) return false;
+    }
+    return true;
+}
+
+/// Validates semantic version strings (`MAJOR.MINOR.PATCH` with optional pre-release/build).
+pub fn validateSemver(value: []const u8) bool {
+    if (value.len == 0) return false;
+
+    // Split into version and optional pre-release/build parts
+    const pre_idx = std.mem.indexOfScalar(u8, value, '-');
+    const build_idx = std.mem.indexOfScalar(u8, value, '+');
+
+    var main_part = value;
+    if (build_idx) |bi| {
+        main_part = value[0..bi];
+        // validate build metadata (alphanumeric + hyphens/dots)
+        const build_meta = value[bi + 1 ..];
+        if (build_meta.len == 0) return false;
+        for (build_meta) |c| {
+            if (!std.ascii.isAlphanumeric(c) and c != '-' and c != '.') return false;
+        }
+    }
+    if (pre_idx) |pi| {
+        if (build_idx) |bi| {
+            if (pi < bi) {
+                main_part = value[0..pi];
+                const pre_part = value[pi + 1 .. bi];
+                if (pre_part.len == 0) return false;
+                for (pre_part) |c| {
+                    if (!std.ascii.isAlphanumeric(c) and c != '-' and c != '.') return false;
+                }
+            }
+        } else {
+            main_part = value[0..pi];
+            const pre_part = value[pi + 1 ..];
+            if (pre_part.len == 0) return false;
+            for (pre_part) |c| {
+                if (!std.ascii.isAlphanumeric(c) and c != '-' and c != '.') return false;
+            }
+        }
+    }
+
+    const dot1 = std.mem.indexOfScalar(u8, main_part, '.') orelse return false;
+    const dot2 = std.mem.lastIndexOfScalar(u8, main_part, '.') orelse return false;
+    if (dot1 == dot2) return false;
+
+    const major = main_part[0..dot1];
+    const minor = main_part[dot1 + 1 .. dot2];
+    const patch = main_part[dot2 + 1 ..];
+
+    if (major.len == 0 or minor.len == 0 or patch.len == 0) return false;
+    for (major) |c| { if (!std.ascii.isDigit(c)) return false; }
+    for (minor) |c| { if (!std.ascii.isDigit(c)) return false; }
+    for (patch) |c| { if (!std.ascii.isDigit(c)) return false; }
+
+    return true;
+}
+
+/// Validates base64 encoded strings.
+pub fn validateBase64(value: []const u8) bool {
+    if (value.len == 0) return false;
+    // Check for valid base64 characters
+    for (value) |c| {
+        if (std.ascii.isAlphanumeric(c)) continue;
+        if (c == '+' or c == '/' or c == '=') continue;
+        return false;
+    }
+    return true;
+}
+
+/// Validates MAC addresses (`XX:XX:XX:XX:XX:XX` or `XX-XX-XX-XX-XX-XX`).
+pub fn validateMacAddress(value: []const u8) bool {
+    if (value.len != 17) return false;
+    const sep = value[2];
+    if (sep != ':' and sep != '-') return false;
+    for (0..6) |i| {
+        const offset = i * 3;
+        if (!std.ascii.isHex(value[offset]) or !std.ascii.isHex(value[offset + 1])) return false;
+        if (i < 5 and value[offset + 2] != sep) return false;
+    }
+    return true;
+}
+
+/// Validates that a string contains only ASCII characters.
+pub fn validateAsciiOnly(value: []const u8) bool {
+    for (value) |c| {
+        if (c > 127) return false;
+    }
+    return true;
+}
+
+/// Validates that a string is all lowercase ASCII.
+pub fn validateLowercase(value: []const u8) bool {
+    for (value) |c| {
+        if (std.ascii.isUpper(c)) return false;
+    }
+    return true;
+}
+
+/// Validates that a string is all uppercase ASCII.
+pub fn validateUppercase(value: []const u8) bool {
+    for (value) |c| {
+        if (std.ascii.isLower(c)) return false;
+    }
+    return true;
+}
+
 /// Validates host:port endpoint values.
 /// Supports: hostname:port, ipv4:port, and [ipv6]:port.
 pub fn validateEndpoint(value: []const u8) bool {
@@ -544,6 +672,41 @@ pub const Validators = struct {
         return if (validatePort(value)) .{ .ok = {} } else .{ .err = "invalid port (expected 1..65535)" };
     }
 
+    pub fn hexColor(io: std.Io, value: []const u8) ValidationResult {
+        _ = io;
+        return if (validateHexColor(value)) .{ .ok = {} } else .{ .err = "invalid hex color (expected #RGB, #RRGGBB, #RGBA, or #RRGGBBAA)" };
+    }
+
+    pub fn semver(io: std.Io, value: []const u8) ValidationResult {
+        _ = io;
+        return if (validateSemver(value)) .{ .ok = {} } else .{ .err = "invalid semantic version (expected MAJOR.MINOR.PATCH)" };
+    }
+
+    pub fn base64(io: std.Io, value: []const u8) ValidationResult {
+        _ = io;
+        return if (validateBase64(value)) .{ .ok = {} } else .{ .err = "invalid base64 string" };
+    }
+
+    pub fn macAddress(io: std.Io, value: []const u8) ValidationResult {
+        _ = io;
+        return if (validateMacAddress(value)) .{ .ok = {} } else .{ .err = "invalid MAC address (expected XX:XX:XX:XX:XX:XX)" };
+    }
+
+    pub fn asciiOnlyStr(io: std.Io, value: []const u8) ValidationResult {
+        _ = io;
+        return if (validateAsciiOnly(value)) .{ .ok = {} } else .{ .err = "value must contain only ASCII characters" };
+    }
+
+    pub fn lowercase(io: std.Io, value: []const u8) ValidationResult {
+        _ = io;
+        return if (validateLowercase(value)) .{ .ok = {} } else .{ .err = "value must be lowercase" };
+    }
+
+    pub fn uppercase(io: std.Io, value: []const u8) ValidationResult {
+        _ = io;
+        return if (validateUppercase(value)) .{ .ok = {} } else .{ .err = "value must be uppercase" };
+    }
+
     pub fn endpoint(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (validateEndpoint(value)) .{ .ok = {} } else .{ .err = "invalid endpoint (expected host:port)" };
@@ -564,6 +727,17 @@ pub const Validators = struct {
                         error.OutOfRange => .{ .err = "integer is out of range" },
                     };
                 };
+                return .{ .ok = {} };
+            }
+        }.validate;
+    }
+
+    pub fn uintRange(comptime min: u64, comptime max: u64) ValidatorFn {
+        return struct {
+            fn validate(io: std.Io, value: []const u8) ValidationResult {
+                _ = io;
+                const parsed = std.fmt.parseInt(u64, value, 10) catch return .{ .err = "invalid unsigned integer" };
+                if (parsed < min or parsed > max) return .{ .err = "unsigned integer is out of range" };
                 return .{ .ok = {} };
             }
         }.validate;
@@ -714,6 +888,9 @@ pub const Validators = struct {
     pub const email = emailAddress;
     pub const url = httpUrl;
     pub const ip = ipv4;
+    pub const hexColour = hexColor;
+    pub const asciiOnly = asciiOnlyStr;
+    pub const mac = macAddress;
     pub const anyIp = ipAny;
     pub const keyValue = keyValuePair;
     pub const hostPort = endpoint;
@@ -957,4 +1134,85 @@ test "Validators keyValuePair" {
 
     try std.testing.expect(Validators.keyValuePair(std.Io.failing, "k=v").isOk());
     try std.testing.expect(!Validators.keyValuePair(std.Io.failing, "k=").isOk());
+}
+
+test "validateHexColor" {
+    try std.testing.expect(validateHexColor("#FF5733"));
+    try std.testing.expect(validateHexColor("#fff"));
+    try std.testing.expect(validateHexColor("#FF5733AA"));
+    try std.testing.expect(validateHexColor("#1234"));
+    try std.testing.expect(!validateHexColor("FF5733"));
+    try std.testing.expect(!validateHexColor("#GGG"));
+    try std.testing.expect(!validateHexColor("#12345"));
+}
+
+test "validateSemver" {
+    try std.testing.expect(validateSemver("1.2.3"));
+    try std.testing.expect(validateSemver("0.0.1"));
+    try std.testing.expect(validateSemver("10.20.30"));
+    try std.testing.expect(validateSemver("1.2.3-beta.1"));
+    try std.testing.expect(validateSemver("1.2.3+build.42"));
+    try std.testing.expect(validateSemver("1.2.3-rc.1+build.42"));
+    try std.testing.expect(!validateSemver("1.2"));
+    try std.testing.expect(!validateSemver("1.2.3.4"));
+    try std.testing.expect(!validateSemver("abc.def.ghi"));
+    try std.testing.expect(!validateSemver(""));
+}
+
+test "validateBase64" {
+    try std.testing.expect(validateBase64("dGVzdA=="));
+    try std.testing.expect(validateBase64("aGVsbG8="));
+    try std.testing.expect(!validateBase64(""));
+    try std.testing.expect(!validateBase64("!!!invalid"));
+}
+
+test "validateMacAddress" {
+    try std.testing.expect(validateMacAddress("00:1A:2B:3C:4D:5E"));
+    try std.testing.expect(validateMacAddress("AA-BB-CC-DD-EE-FF"));
+    try std.testing.expect(!validateMacAddress("00:1A:2B:3C:4D"));
+    try std.testing.expect(!validateMacAddress("GG:HH:II:JJ:KK:LL"));
+    try std.testing.expect(!validateMacAddress(""));
+}
+
+test "validateAsciiOnly" {
+    try std.testing.expect(validateAsciiOnly("Hello, World!"));
+    try std.testing.expect(!validateAsciiOnly("Hëllo"));
+    try std.testing.expect(validateAsciiOnly(""));
+}
+
+test "validateLowercase" {
+    try std.testing.expect(validateLowercase("hello"));
+    try std.testing.expect(!validateLowercase("Hello"));
+    try std.testing.expect(!validateLowercase("HELLO"));
+}
+
+test "validateUppercase" {
+    try std.testing.expect(validateUppercase("HELLO"));
+    try std.testing.expect(!validateUppercase("Hello"));
+    try std.testing.expect(!validateUppercase("hello"));
+}
+
+test "Validators hexColor and semver" {
+    try std.testing.expect(Validators.hexColor(std.Io.failing, "#FF5733").isOk());
+    try std.testing.expect(!Validators.hexColor(std.Io.failing, "not-a-color").isOk());
+
+    try std.testing.expect(Validators.semver(std.Io.failing, "1.2.3").isOk());
+    try std.testing.expect(!Validators.semver(std.Io.failing, "not-semver").isOk());
+}
+
+test "Validators base64, macAddress, asciiOnly, lowercase, uppercase" {
+    try std.testing.expect(Validators.base64(std.Io.failing, "dGVzdA==").isOk());
+    try std.testing.expect(!Validators.base64(std.Io.failing, "!!!").isOk());
+
+    try std.testing.expect(Validators.macAddress(std.Io.failing, "00:1A:2B:3C:4D:5E").isOk());
+    try std.testing.expect(!Validators.macAddress(std.Io.failing, "invalid").isOk());
+
+    try std.testing.expect(Validators.asciiOnly(std.Io.failing, "hello").isOk());
+    try std.testing.expect(!Validators.asciiOnly(std.Io.failing, "hëllo").isOk());
+
+    try std.testing.expect(Validators.lowercase(std.Io.failing, "hello").isOk());
+    try std.testing.expect(!Validators.lowercase(std.Io.failing, "Hello").isOk());
+
+    try std.testing.expect(Validators.uppercase(std.Io.failing, "HELLO").isOk());
+    try std.testing.expect(!Validators.uppercase(std.Io.failing, "Hello").isOk());
 }

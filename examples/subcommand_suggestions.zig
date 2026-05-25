@@ -2,7 +2,7 @@ const std = @import("std");
 const args = @import("args");
 
 pub fn main(init: std.process.Init) !void {
-    const allocator = std.heap.c_allocator;
+    const allocator = init.arena.allocator();
 
     const argv = try init.minimal.args.toSlice(init.arena.allocator());
 
@@ -37,3 +37,4 @@ pub fn main(init: std.process.Init) !void {
         return;
     };
 }
+

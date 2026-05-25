@@ -177,6 +177,95 @@ pub fn addDecryptionOption(self: *ArgumentParser, name: []const u8, options: str
 
 Adds a string option that decodes incoming Base64 input before validation and storage.
 
+### `addIntOption`
+
+```zig
+pub fn addIntOption(self: *ArgumentParser, name: []const u8, options: struct {
+    short: ?u8 = null,
+    help: ?[]const u8 = null,
+    default: ?[]const u8 = null,
+    required: bool = false,
+    metavar: ?[]const u8 = "INT",
+    dest: ?[]const u8 = null,
+    env_var: ?[]const u8 = null,
+    hidden: bool = false,
+    aliases: []const []const u8 = &.{},
+    deprecated: ?[]const u8 = null,
+    expect: []const []const u8 = &.{},
+    comptime min: ?i64 = null,
+    comptime max: ?i64 = null,
+}) !void
+```
+
+Adds an integer-typed option (`.int` value type) with optional range validation.
+
+### `addFloatOption`
+
+```zig
+pub fn addFloatOption(self: *ArgumentParser, name: []const u8, options: struct {
+    short: ?u8 = null,
+    help: ?[]const u8 = null,
+    default: ?[]const u8 = null,
+    required: bool = false,
+    metavar: ?[]const u8 = "FLOAT",
+    dest: ?[]const u8 = null,
+    env_var: ?[]const u8 = null,
+    hidden: bool = false,
+    aliases: []const []const u8 = &.{},
+    deprecated: ?[]const u8 = null,
+    expect: []const []const u8 = &.{},
+    comptime min: ?f64 = null,
+    comptime max: ?f64 = null,
+}) !void
+```
+
+Adds a float-typed option (`.float` value type) with optional range validation.
+
+### `addUintOption`
+
+```zig
+pub fn addUintOption(self: *ArgumentParser, name: []const u8, options: struct {
+    short: ?u8 = null,
+    help: ?[]const u8 = null,
+    default: ?[]const u8 = null,
+    required: bool = false,
+    metavar: ?[]const u8 = "UINT",
+    dest: ?[]const u8 = null,
+    env_var: ?[]const u8 = null,
+    hidden: bool = false,
+    aliases: []const []const u8 = &.{},
+    deprecated: ?[]const u8 = null,
+    expect: []const []const u8 = &.{},
+    comptime min: ?u64 = null,
+    comptime max: ?u64 = null,
+}) !void
+```
+
+Adds an unsigned integer-typed option (non-negative `.uint` value type) with optional range validation.
+
+### `addHexOption`
+
+```zig
+pub fn addHexOption(self: *ArgumentParser, name: []const u8, options: struct {
+    short: ?u8 = null,
+    help: ?[]const u8 = null,
+    default: ?[]const u8 = null,
+    required: bool = false,
+    metavar: ?[]const u8 = "HEX",
+    dest: ?[]const u8 = null,
+    env_var: ?[]const u8 = null,
+    hidden: bool = false,
+    aliases: []const []const u8 = &.{},
+    deprecated: ?[]const u8 = null,
+    validator: ?validation.ValidatorFn = null,
+    expect: []const []const u8 = &.{},
+    suggestion_hint: ?[]const u8 = null,
+    custom_error_message: ?[]const u8 = null,
+}) !void
+```
+
+Adds an option whose value is decoded from hexadecimal before storage.
+
 ### `addFalseFlag`
 
 ```zig
@@ -306,6 +395,52 @@ Example:
 ```zig
 try parser.addEndpointOption("service", .{
     .help = "Service endpoint (host:port)",
+});
+```
+
+### Numeric Typed Option Helpers
+
+Convenience helpers for typed numeric options:
+
+- `addIntOption` — `.int` value type, optional `min`/`max` range validation
+- `addFloatOption` — `.float` value type, optional `min`/`max` range validation
+- `addUintOption` — `.uint` value type (non-negative integers)
+
+**Example:**
+```zig
+try parser.addIntOption("retries", .{
+    .short = 'r',
+    .help = "Retry count (0-10)",
+    .min = 0,
+    .max = 10,
+    .default = "3",
+});
+
+try parser.addFloatOption("threshold", .{
+    .short = 't',
+    .help = "Confidence threshold (0.0 to 1.0)",
+    .min = 0.0,
+    .max = 1.0,
+    .default = "0.75",
+});
+
+try parser.addUintOption("threads", .{
+    .short = 'p',
+    .help = "Worker thread count",
+    .default = "4",
+});
+```
+
+### Decode / Encoding Option Helpers
+
+- `addHexOption` — Decodes hexadecimal input before storage
+
+**Example:**
+```zig
+try parser.addHexOption("key", .{
+    .short = 'k',
+    .help = "Hex-encoded key material",
+    .required = true,
 });
 ```
 
@@ -564,6 +699,121 @@ try parser.addCounter("verbose", .{
     .short = 'v',
     .help = "Increase verbosity",
 });
+```
+
+### `addListOption`
+
+```zig
+pub fn addListOption(self: *ArgumentParser, name: []const u8, options: struct {
+    short: ?u8 = null,
+    help: ?[]const u8 = null,
+    default: ?[]const u8 = null,
+    required: bool = false,
+    metavar: ?[]const u8 = "LIST",
+    dest: ?[]const u8 = null,
+    env_var: ?[]const u8 = null,
+    hidden: bool = false,
+    aliases: []const []const u8 = &.{},
+    deprecated: ?[]const u8 = null,
+    validator: ?validation.ValidatorFn = null,
+    expect: []const []const u8 = &.{},
+    suggestion_hint: ?[]const u8 = null,
+    custom_error_message: ?[]const u8 = null,
+    separator: u8 = ',',
+}) !void
+```
+
+Adds a list/array option that splits a comma-separated value into an array of strings. Stored as `.array` type.
+
+**Example:**
+```zig
+try parser.addListOption("allow-hosts", .{
+    .short = 'a',
+    .help = "Comma-separated list of allowed hosts",
+});
+// --allow-hosts a,b,c  → result.getArray("allow-hosts") returns &[_][]const u8{"a", "b", "c"}
+```
+
+### `addSecretOption`
+
+```zig
+pub fn addSecretOption(self: *ArgumentParser, name: []const u8, options: struct {
+    short: ?u8 = null,
+    help: ?[]const u8 = null,
+    default: ?[]const u8 = null,
+    required: bool = false,
+    metavar: ?[]const u8 = null,
+    dest: ?[]const u8 = null,
+    env_var: ?[]const u8 = null,
+    aliases: []const []const u8 = &.{},
+    deprecated: ?[]const u8 = null,
+}) !void
+```
+
+Adds a password/secret option stored as a string. The option is hidden from help output. The invoking application is responsible for disabling terminal echo when prompting.
+
+### `addEnvOption`
+
+```zig
+pub fn addEnvOption(self: *ArgumentParser, name: []const u8, options: struct {
+    short: ?u8 = null,
+    help: ?[]const u8 = null,
+    value_type: ValueType = .string,
+    default: ?[]const u8 = null,
+    required: bool = false,
+    metavar: ?[]const u8 = null,
+    dest: ?[]const u8 = null,
+    env_var: ?[]const u8 = null,
+    hidden: bool = false,
+    aliases: []const []const u8 = &.{},
+    deprecated: ?[]const u8 = null,
+    validator: ?validation.ValidatorFn = null,
+    expect: []const []const u8 = &.{},
+}) !void
+```
+
+Adds an option with automatic environment variable fallback. The env var name is derived from the option name (uppercased, hyphens → underscores) unless `env_var` is explicitly provided.
+
+Convenience wrapper around `addOption` with automatic `env_var` derivation.
+
+**Example:**
+```zig
+// Env var derived as "DB_HOST" from "db-host"
+try parser.addEnvOption("db-host", .{
+    .help = "Database hostname",
+    .default = "localhost",
+});
+```
+
+### `addLogLevel`
+
+```zig
+pub fn addLogLevel(self: *ArgumentParser, verbose_options: struct {
+    name: []const u8 = "verbose",
+    short: ?u8 = 'v',
+    help: ?[]const u8 = "Increase verbosity level",
+    dest: ?[]const u8 = null,
+    hidden: bool = false,
+    aliases: []const []const u8 = &.{},
+}, quiet_options: struct {
+    name: []const u8 = "quiet",
+    short: ?u8 = 'q',
+    help: ?[]const u8 = "Decrease verbosity level (suppress output)",
+    dest: ?[]const u8 = null,
+    hidden: bool = false,
+    aliases: []const []const u8 = &.{},
+}) !void
+```
+
+Adds a `--verbose` / `--quiet` pair wired to a shared counter destination.
+`--verbose` increments, `--quiet` decrements the same counter.
+
+**Example:**
+```zig
+try parser.addLogLevel(
+    .{ .name = "verbose", .short = 'v', .dest = "verbosity" },
+    .{ .name = "quiet",   .short = 'q', .dest = "verbosity" },
+);
 ```
 
 ### `addSubcommand`
@@ -998,6 +1248,76 @@ pub fn getFloat(self: *const ParseResult, name: []const u8) ?f64
 ```
 
 Gets a float value.
+
+#### `getUint`
+
+```zig
+pub fn getUint(self: *const ParseResult, name: []const u8) ?u64
+```
+
+Gets an unsigned integer value.
+
+#### `getArray`
+
+```zig
+pub fn getArray(self: *const ParseResult, name: []const u8) ?[]const []const u8
+```
+
+Gets an array value (returned by `addListOption`).
+
+#### `getEnum`
+
+```zig
+pub fn getEnum(self: *const ParseResult, comptime T: type, name: []const u8) ?T
+```
+
+Gets an enum value by converting the stored string to the given enum type. Returns `null` if the value is missing or the string does not match any enum field.
+
+**Example:**
+```zig
+const Level = enum { debug, info, warn, error };
+const level = result.getEnum(Level, "log-level") orelse .info;
+```
+
+#### `getOrString`
+
+```zig
+pub fn getOrString(self: *const ParseResult, name: []const u8, default: []const u8) []const u8
+```
+
+Gets a string value with a default fallback.
+
+#### `getOrInt`
+
+```zig
+pub fn getOrInt(self: *const ParseResult, name: []const u8, default: i64) i64
+```
+
+Gets an integer value with a default fallback.
+
+#### `getOrBool`
+
+```zig
+pub fn getOrBool(self: *const ParseResult, name: []const u8, default: bool) bool
+```
+
+Gets a boolean value with a default fallback.
+
+#### `getOrFloat`
+
+```zig
+pub fn getOrFloat(self: *const ParseResult, name: []const u8, default: f64) f64
+```
+
+Gets a float value with a default fallback.
+
+#### `getOrUint`
+
+```zig
+pub fn getOrUint(self: *const ParseResult, name: []const u8, default: u64) u64
+```
+
+Gets an unsigned integer value with a default fallback.
 
 #### `contains`
 

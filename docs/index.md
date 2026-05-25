@@ -41,6 +41,9 @@ features:
   - icon: ✅
     title: Robust Validation
     details: Built-in validation for types, choices, ranges, and custom rules. Comprehensive error reporting with "Did you mean?" suggestions.
+  - icon: 🧾
+    title: Error Formatting
+    details: Shared helpers for parse, schema, and validation error messages so your CLI output stays consistent.
   - icon: 🚫
     title: Negated Flags
     details: Native `--no-flag` support for long boolean options, with config control for strict compatibility.

@@ -2,7 +2,7 @@ const std = @import("std");
 const args = @import("args");
 
 pub fn main(init: std.process.Init) !void {
-    const allocator = std.heap.c_allocator;
+    const allocator = init.arena.allocator();
 
     // Initialize configuration.
     // By default, parsing_mode is .permissive, which causes 'expect' to warn on mismatch.
@@ -46,3 +46,4 @@ pub fn main(init: std.process.Init) !void {
     std.debug.print("  Environment: {s}\n", .{env});
     std.debug.print("  Output:      {s}\n", .{output});
 }
+

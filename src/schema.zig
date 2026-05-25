@@ -36,6 +36,10 @@ pub fn deriveOptions(comptime T: type) []const ArgSpec {
         }
 
         const FieldType = field.type;
+        const InnerType = if (@typeInfo(FieldType) == .optional) @typeInfo(FieldType).optional.child else FieldType;
+
+        const is_enum = @typeInfo(InnerType) == .@"enum";
+
         const value_type: ValueType = if (FieldType == bool or FieldType == ?bool)
             .bool
         else if (FieldType == []const u8 or FieldType == ?[]const u8)
@@ -46,6 +50,8 @@ pub fn deriveOptions(comptime T: type) []const ArgSpec {
             .uint
         else if (FieldType == f32 or FieldType == ?f32 or FieldType == f64 or FieldType == ?f64)
             .float
+        else if (is_enum)
+            .choice
         else
             .string;
 
@@ -97,6 +103,7 @@ pub const ArgSpec = struct {
     suggestion_hint: ?[]const u8 = null,
     custom_error_message: ?[]const u8 = null,
     decode_mode: DecodeMode = .none,
+    separator: u8 = 0,
 
     /// Get the destination name for storing the value.
     pub fn getDestination(self: *const ArgSpec) []const u8 {
