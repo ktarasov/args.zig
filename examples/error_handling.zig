@@ -69,5 +69,3 @@ pub fn main(init: std.process.Init) !void {
     std.debug.print("schema error helper -> {s}\n", .{args.errors.formatSchemaError(error.DuplicateArgument)});
     std.debug.print("validation error helper -> {s}\n", .{args.errors.formatValidationError(error.InvalidPath)});
 }
-
-

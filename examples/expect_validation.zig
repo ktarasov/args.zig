@@ -46,4 +46,3 @@ pub fn main(init: std.process.Init) !void {
     std.debug.print("  Environment: {s}\n", .{env});
     std.debug.print("  Output:      {s}\n", .{output});
 }
-

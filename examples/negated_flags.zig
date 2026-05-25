@@ -35,5 +35,3 @@ pub fn main(init: std.process.Init) !void {
     std.debug.print("cache: {}\n", .{result.getBool("cache") orelse true});
     std.debug.print("color: {}\n", .{result.getBool("color") orelse false});
 }
-
-

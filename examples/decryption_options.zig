@@ -36,5 +36,3 @@ pub fn main(init: std.process.Init) !void {
     std.debug.print("secret: {s}\n", .{parsed.getString("secret") orelse "<missing>"});
     std.debug.print("session: {s}\n", .{parsed.getString("session") orelse "<missing>"});
 }
-
-

@@ -43,5 +43,3 @@ pub fn main(init: std.process.Init) !void {
     std.debug.print("workspace: {s}\n", .{parsed.getString("workspace") orelse "<missing>"});
     std.debug.print("output-name: {s}\n", .{parsed.getString("output-name") orelse "<missing>"});
 }
-
-

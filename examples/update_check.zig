@@ -83,4 +83,3 @@ pub fn main(init: std.process.Init) !void {
     defer allocator.free(help_text);
     std.debug.print("{s}", .{help_text});
 }
-

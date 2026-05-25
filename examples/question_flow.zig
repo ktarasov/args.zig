@@ -40,4 +40,3 @@ pub fn main(init: std.process.Init) !void {
         .selected => |name| std.debug.print("Decision: {s}\n", .{name}),
     }
 }
-

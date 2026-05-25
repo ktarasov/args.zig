@@ -48,6 +48,8 @@ pub fn build(b: *std.Build) void {
     // Create run-all-examples step that runs all examples sequentially
     const run_all_examples = b.step("run-all-examples", "Run all examples sequentially");
 
+    var previous_step: ?*std.Build.Step = null;
+
     // Build examples in smaller batches to avoid OOM
     inline for (examples) |example| {
         const exe = b.addExecutable(.{
@@ -67,6 +69,13 @@ pub fn build(b: *std.Build) void {
         }
 
         const install_exe = b.addInstallArtifact(exe, .{});
+
+        // Serialize example builds to avoid OOM under parallel job runs
+        if (previous_step) |prev| {
+            install_exe.step.dependOn(prev);
+        }
+        previous_step = &install_exe.step;
+
         const example_step = b.step("example-" ++ example.name, "Build " ++ example.name ++ " example");
         example_step.dependOn(&install_exe.step);
 

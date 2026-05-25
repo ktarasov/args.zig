@@ -33,5 +33,3 @@ pub fn main(init: std.process.Init) !void {
     std.debug.print("mode: {s}\n", .{result.getString("mode") orelse "<missing>"});
     std.debug.print("color: {}\n", .{result.getBool("color") orelse true});
 }
-
-

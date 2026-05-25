@@ -450,9 +450,15 @@ pub fn validateSemver(value: []const u8) bool {
     const patch = main_part[dot2 + 1 ..];
 
     if (major.len == 0 or minor.len == 0 or patch.len == 0) return false;
-    for (major) |c| { if (!std.ascii.isDigit(c)) return false; }
-    for (minor) |c| { if (!std.ascii.isDigit(c)) return false; }
-    for (patch) |c| { if (!std.ascii.isDigit(c)) return false; }
+    for (major) |c| {
+        if (!std.ascii.isDigit(c)) return false;
+    }
+    for (minor) |c| {
+        if (!std.ascii.isDigit(c)) return false;
+    }
+    for (patch) |c| {
+        if (!std.ascii.isDigit(c)) return false;
+    }
 
     return true;
 }

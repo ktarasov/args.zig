@@ -554,7 +554,7 @@ pub fn main(init: std.process.Init) !void {
         @tagName(builtin.cpu.arch),
         WARMUP,
         ITERATIONS,
-    }    ) catch "";
+    }) catch "";
     try md_file.writeStreamingAll(bench_io, header);
 
     // Write categorized tables
