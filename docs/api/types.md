@@ -390,4 +390,32 @@ pub const IncludeExcludeStrictResolved = struct {
     exclude: [][]const u8,
     allocator: std.mem.Allocator,
 };
+
+pub const IncludeExcludeResolved = struct {
+    include: [][]const u8,
+    exclude: [][]const u8,
+    allocator: std.mem.Allocator,
+};
+```
+
+## Select/All Helper Types
+
+These helper types support strict CSV select/all filter workflows.
+
+```zig
+pub const SelectOrAllStrictOptions = struct {
+    select_key: []const u8 = "select",
+    all_key: []const u8 = "all",
+    choices: []const []const u8 = &.{},
+    case_sensitive: bool = false,
+    allow_prefix_match: bool = true,
+    dedupe: bool = true,
+    require_selection_when_not_all: bool = false,
+};
+
+pub const SelectOrAllStrictResolved = struct {
+    all: bool,
+    selected: [][]const u8,
+    allocator: std.mem.Allocator,
+};
 ```

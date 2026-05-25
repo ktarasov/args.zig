@@ -1048,6 +1048,7 @@ pub fn parseInto(
     comptime T: type,
     options: ArgumentParser.InitOptions,
     args_slice: ?[]const []const u8,
+    init: ?std.process.Init,
 ) !ParseIntoResult(T)
 ```
 
@@ -1058,6 +1059,7 @@ Parses command-line arguments directly into a struct type. Derives argument spec
 - `T` - The struct type to parse into
 - `options` - Parser initialization options
 - `args_slice` - Argument slice to parse, or `null` to use process args
+- `init` - Process initialization context (`std.process.Init`), required if `args_slice` is `null`
 
 **Example:**
 ```zig
@@ -1069,7 +1071,7 @@ const Config = struct {
 
 var result = try args.parseInto(allocator, Config, .{
     .name = "myapp",
-}, null);
+}, null, init);
 defer result.deinit();
 
 std.debug.print("Count: {d}\n", .{result.options.count});
@@ -1088,8 +1090,8 @@ For convenience, the library provides several aliases:
 **Example:**
 ```zig
 // These are equivalent:
-var parsed = try args.parseInto(allocator, Config, options, null);
-var parsed = try args.derive(allocator, Config, options, null);
+var parsed = try args.parseInto(allocator, Config, options, null, init);
+var parsed = try args.derive(allocator, Config, options, null, init);
 
 // These are equivalent:
 args.initConfig(.{ .use_colors = false });
