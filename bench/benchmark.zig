@@ -26,6 +26,8 @@ const BenchmarkResult = struct {
 const ITERATIONS = 10_000;
 const WARMUP = 100;
 
+var bench_io: std.Io = undefined;
+
 fn printResults(results: []const BenchmarkResult) void {
     std.debug.print("\n", .{});
     std.debug.print("-" ** 100, .{});
@@ -70,6 +72,7 @@ fn printResults(results: []const BenchmarkResult) void {
 fn runBenchmark(
     name: []const u8,
     allocator: std.mem.Allocator,
+    io: std.Io,
     comptime benchFn: anytype,
     category: []const u8,
 ) !BenchmarkResult {
@@ -79,11 +82,12 @@ fn runBenchmark(
     }
 
     // Benchmark
-    var timer = try std.time.Timer.start();
+    const bench_start = std.Io.Timestamp.now(io, .boot);
     for (0..ITERATIONS) |_| {
         try benchFn(allocator);
     }
-    const total_time_ns = timer.read();
+    const bench_end = std.Io.Timestamp.now(io, .boot);
+    const total_time_ns = @as(u64, @intCast(bench_end.nanoseconds - bench_start.nanoseconds));
 
     const ops_per_sec = @as(f64, @floatFromInt(ITERATIONS)) / (@as(f64, @floatFromInt(total_time_ns)) / 1_000_000_000.0);
     const avg_latency_ns = @as(f64, @floatFromInt(total_time_ns)) / @as(f64, @floatFromInt(ITERATIONS));
@@ -288,7 +292,7 @@ fn benchmarkFileNamePolicyValidation(allocator: std.mem.Allocator) !void {
 }
 
 fn benchmarkTypedInputValidation(allocator: std.mem.Allocator) !void {
-    const cwd_abs = try std.fs.cwd().realpathAlloc(allocator, ".");
+    const cwd_abs = try std.process.currentPathAlloc(bench_io, allocator);
     defer allocator.free(cwd_abs);
 
     const test_args = [_][]const u8{
@@ -372,7 +376,7 @@ fn benchmarkStructParsing(allocator: std.mem.Allocator) !void {
     var parsed = try args.parseInto(allocator, Config, .{
         .name = "bench",
         .config = args.Config.minimal(),
-    }, &test_args);
+    }, &test_args, null);
     parsed.deinit();
 }
 
@@ -415,8 +419,9 @@ fn benchmarkIncludeExcludeStrict(allocator: std.mem.Allocator) !void {
 }
 
 fn benchmarkPromptResolutionParsed(allocator: std.mem.Allocator) !void {
+    _ = allocator;
     const test_args = [_][]const u8{"--all"};
-    var parser = try initBenchParser(allocator, "bench");
+    var parser = try initBenchParser(std.heap.c_allocator, "bench");
     defer parser.deinit();
 
     try parser.addSelectOrAll(.{
@@ -426,16 +431,15 @@ fn benchmarkPromptResolutionParsed(allocator: std.mem.Allocator) !void {
     var parsed = try parser.parse(&test_args);
     defer parsed.deinit();
 
-    var input_stream = std.io.fixedBufferStream("");
-    var output_buf: [64]u8 = undefined;
-    var output_stream = std.io.fixedBufferStream(&output_buf);
+    var input_reader: std.Io.Reader = .fixed("\n");
+    var out_buf: [512]u8 = undefined;
+    var output_writer: std.Io.Writer = .fixed(&out_buf);
 
     const decision = try args.resolveSelectOrAllWithPromptIO(
-        allocator,
         &parsed,
         .{ .choices = &[_][]const u8{ "users", "groups", "logs" } },
-        input_stream.reader(),
-        output_stream.writer(),
+        &input_reader,
+        &output_writer,
     );
     _ = decision;
 }
@@ -454,8 +458,9 @@ fn benchmarkSubcommandSuggestionLookup(allocator: std.mem.Allocator) !void {
     _ = sug;
 }
 
-pub fn main() !void {
-    const allocator = std.heap.c_allocator;
+pub fn main(init: std.process.Init) !void {
+    bench_io = init.io;
+    const allocator = init.gpa;
 
     var results: std.ArrayList(BenchmarkResult) = .empty;
     defer results.deinit(allocator);
@@ -464,38 +469,38 @@ pub fn main() !void {
     args.initConfig(args.Config.minimal());
 
     // Basic Parsing
-    try results.append(allocator, try runBenchmark("Simple Flags (3 flags)", allocator, benchmarkSimpleFlags, "Basic Parsing"));
-    try results.append(allocator, try runBenchmark("Multiple Options (3 options)", allocator, benchmarkMultipleOptions, "Basic Parsing"));
-    try results.append(allocator, try runBenchmark("Positional Arguments (3 positionals)", allocator, benchmarkPositionals, "Basic Parsing"));
-    try results.append(allocator, try runBenchmark("Counters (-vvv -dd)", allocator, benchmarkCounters, "Basic Parsing"));
+    try results.append(allocator, try runBenchmark("Simple Flags (3 flags)", allocator, bench_io, benchmarkSimpleFlags, "Basic Parsing"));
+    try results.append(allocator, try runBenchmark("Multiple Options (3 options)", allocator, bench_io, benchmarkMultipleOptions, "Basic Parsing"));
+    try results.append(allocator, try runBenchmark("Positional Arguments (3 positionals)", allocator, bench_io, benchmarkPositionals, "Basic Parsing"));
+    try results.append(allocator, try runBenchmark("Counters (-vvv -dd)", allocator, bench_io, benchmarkCounters, "Basic Parsing"));
 
     // Advanced Features
-    try results.append(allocator, try runBenchmark("Subcommands (2 subcommands)", allocator, benchmarkSubcommands, "Advanced Features"));
-    try results.append(allocator, try runBenchmark("Mixed Arguments (complex CLI)", allocator, benchmarkMixedArgs, "Advanced Features"));
-    try results.append(allocator, try runBenchmark("Argument Groups", allocator, benchmarkArgumentGroups, "Advanced Features"));
-    try results.append(allocator, try runBenchmark("Callbacks", allocator, benchmarkCallbacks, "Advanced Features"));
-    try results.append(allocator, try runBenchmark("Expect Validation", allocator, benchmarkExpectValidation, "Advanced Features"));
-    try results.append(allocator, try runBenchmark("Declarative Structs", allocator, benchmarkStructParsing, "Advanced Features"));
+    try results.append(allocator, try runBenchmark("Subcommands (2 subcommands)", allocator, bench_io, benchmarkSubcommands, "Advanced Features"));
+    try results.append(allocator, try runBenchmark("Mixed Arguments (complex CLI)", allocator, bench_io, benchmarkMixedArgs, "Advanced Features"));
+    try results.append(allocator, try runBenchmark("Argument Groups", allocator, bench_io, benchmarkArgumentGroups, "Advanced Features"));
+    try results.append(allocator, try runBenchmark("Callbacks", allocator, bench_io, benchmarkCallbacks, "Advanced Features"));
+    try results.append(allocator, try runBenchmark("Expect Validation", allocator, bench_io, benchmarkExpectValidation, "Advanced Features"));
+    try results.append(allocator, try runBenchmark("Declarative Structs", allocator, bench_io, benchmarkStructParsing, "Advanced Features"));
 
     // Workflow Helpers
-    try results.append(allocator, try runBenchmark("Negated Flags", allocator, benchmarkNegatedFlags, "Workflow Helpers"));
-    try results.append(allocator, try runBenchmark("Select/All Helpers", allocator, benchmarkSelectOrAllHelpers, "Workflow Helpers"));
-    try results.append(allocator, try runBenchmark("Select/All CSV Strict Resolve", allocator, benchmarkSelectOrAllStrictCsv, "Workflow Helpers"));
-    try results.append(allocator, try runBenchmark("Include/Exclude Strict Resolve", allocator, benchmarkIncludeExcludeStrict, "Workflow Helpers"));
-    try results.append(allocator, try runBenchmark("Prompt Resolution (Parsed)", allocator, benchmarkPromptResolutionParsed, "Workflow Helpers"));
-    try results.append(allocator, try runBenchmark("Suggestion Lookup", allocator, benchmarkSuggestionLookup, "Workflow Helpers"));
-    try results.append(allocator, try runBenchmark("Subcommand Suggestion Lookup", allocator, benchmarkSubcommandSuggestionLookup, "Workflow Helpers"));
+    try results.append(allocator, try runBenchmark("Negated Flags", allocator, bench_io, benchmarkNegatedFlags, "Workflow Helpers"));
+    try results.append(allocator, try runBenchmark("Select/All Helpers", allocator, bench_io, benchmarkSelectOrAllHelpers, "Workflow Helpers"));
+    try results.append(allocator, try runBenchmark("Select/All CSV Strict Resolve", allocator, bench_io, benchmarkSelectOrAllStrictCsv, "Workflow Helpers"));
+    try results.append(allocator, try runBenchmark("Include/Exclude Strict Resolve", allocator, bench_io, benchmarkIncludeExcludeStrict, "Workflow Helpers"));
+    try results.append(allocator, try runBenchmark("Prompt Resolution (Parsed)", allocator, bench_io, benchmarkPromptResolutionParsed, "Workflow Helpers"));
+    try results.append(allocator, try runBenchmark("Suggestion Lookup", allocator, bench_io, benchmarkSuggestionLookup, "Workflow Helpers"));
+    try results.append(allocator, try runBenchmark("Subcommand Suggestion Lookup", allocator, bench_io, benchmarkSubcommandSuggestionLookup, "Workflow Helpers"));
 
     // Validation
-    try results.append(allocator, try runBenchmark("File Extension Validation", allocator, benchmarkFileExtensionValidation, "Validation"));
-    try results.append(allocator, try runBenchmark("File Name Policy Validation", allocator, benchmarkFileNamePolicyValidation, "Validation"));
-    try results.append(allocator, try runBenchmark("Typed Input Validation", allocator, benchmarkTypedInputValidation, "Validation"));
-    try results.append(allocator, try runBenchmark("Decryption Option (Base64)", allocator, benchmarkDecryptionOption, "Validation"));
+    try results.append(allocator, try runBenchmark("File Extension Validation", allocator, bench_io, benchmarkFileExtensionValidation, "Validation"));
+    try results.append(allocator, try runBenchmark("File Name Policy Validation", allocator, bench_io, benchmarkFileNamePolicyValidation, "Validation"));
+    try results.append(allocator, try runBenchmark("Typed Input Validation", allocator, bench_io, benchmarkTypedInputValidation, "Validation"));
+    try results.append(allocator, try runBenchmark("Decryption Option (Base64)", allocator, bench_io, benchmarkDecryptionOption, "Validation"));
 
     // Generation
-    try results.append(allocator, try runBenchmark("Help Text Generation", allocator, benchmarkHelpGeneration, "Generation"));
-    try results.append(allocator, try runBenchmark("Shell Completion Generation (Bash)", allocator, benchmarkCompletionGeneration, "Generation"));
-    try results.append(allocator, try runBenchmark("Shell Completion Generation (Zsh)", allocator, benchmarkCompletionGenerationZsh, "Generation"));
+    try results.append(allocator, try runBenchmark("Help Text Generation", allocator, bench_io, benchmarkHelpGeneration, "Generation"));
+    try results.append(allocator, try runBenchmark("Shell Completion Generation (Bash)", allocator, bench_io, benchmarkCompletionGeneration, "Generation"));
+    try results.append(allocator, try runBenchmark("Shell Completion Generation (Zsh)", allocator, bench_io, benchmarkCompletionGenerationZsh, "Generation"));
 
     // Print all results to console
     printResults(results.items);
@@ -525,11 +530,11 @@ pub fn main() !void {
     const avg_latency = if (avg_ops > 0) 1_000_000_000.0 / avg_ops else 0;
 
     // Write final Markdown report
-    const md_file = std.fs.cwd().createFile("benchmark-results.md", .{}) catch |err| {
+    const md_file = std.Io.Dir.createFileAbsolute(bench_io, "benchmark-results.md", .{}) catch |err| {
         std.debug.print("Warning: Could not create benchmark-results.md: {}\n", .{err});
         return;
     };
-    defer md_file.close();
+    defer md_file.close(bench_io);
 
     const md_header =
         \\#### 📊 ARGS.ZIG BENCHMARK RESULTS
@@ -549,8 +554,8 @@ pub fn main() !void {
         @tagName(builtin.cpu.arch),
         WARMUP,
         ITERATIONS,
-    }) catch "";
-    try md_file.writeAll(header);
+    }    ) catch "";
+    try md_file.writeStreamingAll(bench_io, header);
 
     // Write categorized tables
     for (BenchmarkResult.categories) |cat| {
@@ -573,7 +578,7 @@ pub fn main() !void {
             \\
         , .{cat}) catch continue;
         defer allocator.free(cat_md);
-        try md_file.writeAll(cat_md);
+        try md_file.writeStreamingAll(bench_io, cat_md);
 
         for (results.items) |r| {
             if (std.mem.eql(u8, r.category, cat)) {
@@ -583,14 +588,14 @@ pub fn main() !void {
                     r.ops_per_sec,
                     r.avg_latency_ns,
                 }) catch continue;
-                try md_file.writeAll(line);
+                try md_file.writeStreamingAll(bench_io, line);
             }
         }
-        try md_file.writeAll("</details>\n");
+        try md_file.writeStreamingAll(bench_io, "</details>\n");
     }
 
     if (count > 0) {
-        try md_file.writeAll("\n### 📈 Benchmark Summary\n\n");
+        try md_file.writeStreamingAll(bench_io, "\n### 📈 Benchmark Summary\n\n");
         var summary_buf: [1024]u8 = undefined;
         const summary = std.fmt.bufPrint(&summary_buf,
             \\- **Total benchmarks run:** {d}
@@ -600,7 +605,7 @@ pub fn main() !void {
             \\- **Average latency:** {d:.0} ns
             \\
         , .{ count, avg_ops, max_ops, max_name, min_ops, min_name, avg_latency }) catch "";
-        try md_file.writeAll(summary);
+        try md_file.writeStreamingAll(bench_io, summary);
     }
 
     std.debug.print("[OK] Benchmarks completed successfully!\n", .{});

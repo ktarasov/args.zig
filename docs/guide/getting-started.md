@@ -32,12 +32,6 @@ Install the supported release for zig v0.15 (v0.0.4):
 zig fetch --save https://github.com/muhammad-fiaz/args.zig/archive/refs/tags/0.0.4.tar.gz
 ```
 
-> [!NOTE]
->
-> For Zig v0.15, use `v0.0.4`.  
-> For Zig v0.16 and above, use `v0.0.5`.  
-> Keep in mind that `v0.0.5` is only compatible with Zig v0.16+.
-
 ### Nightly Installation
 
 Install the latest development version:
