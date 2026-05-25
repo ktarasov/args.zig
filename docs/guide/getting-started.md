@@ -119,7 +119,6 @@ pub fn main(init: std.process.Init) !void {
 ```
 
 > [!NOTE]
-> ## Understanding `std.process.Init` (Zig 0.16)
 >
 > In Zig 0.16, the `main` function signature changed to `pub fn main(init: std.process.Init) !void`.
 >
