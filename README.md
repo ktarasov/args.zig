@@ -41,6 +41,7 @@ A production-grade, high-performance command-line argument parsing library for Z
 - For **logging** support, check out **[logly.zig](https://github.com/muhammad-fiaz/logly.zig)**.
 - For **data validation and serialization** support, check out **[zigantic](https://github.com/muhammad-fiaz/zigantic)**.
 - For **HTTP Server/Client** support, check out **[httpx.zig](https://github.com/muhammad-fiaz/httpx.zig)**.
+- For **ZON file format** support, check out **[zon.zig](https://github.com/muhammad-fiaz/zon.zig)**  
 
 ⭐ **If you love `args.zig`, make sure to give it a star!**
 
