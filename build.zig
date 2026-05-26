@@ -42,6 +42,10 @@ pub fn build(b: *std.Build) void {
         .{ .name = "env_var_config", .path = "examples/env_var_config.zig" },
         .{ .name = "list_option", .path = "examples/list_option.zig" },
         .{ .name = "validation_demo", .path = "examples/validation_demo.zig" },
+        .{ .name = "conflict_demo", .path = "examples/conflict_demo.zig" },
+        .{ .name = "config_warnings", .path = "examples/config_warnings.zig" },
+        .{ .name = "duration_size", .path = "examples/duration_size.zig" },
+        .{ .name = "subcommand_range", .path = "examples/subcommand_range.zig" },
         .{ .name = "update_check", .path = "examples/update_check.zig", .skip_run_all = true },
     };
 

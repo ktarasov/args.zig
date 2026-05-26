@@ -16,6 +16,10 @@ pub const ValueType = enum {
     counter,
     custom,
     key_value,
+    /// Duration value — stored as u64 seconds (parsed from strings like "1h30m", "45s").
+    duration,
+    /// Byte size value — stored as u64 bytes (parsed from strings like "1GB", "512MB").
+    byte_size,
 
     /// Get the default value as a string for this type.
     pub fn defaultAsString(self: ValueType) []const u8 {
@@ -31,6 +35,8 @@ pub const ValueType = enum {
             .counter => constants.TypeNames.default_int,
             .custom => constants.TypeNames.default_string,
             .key_value => constants.TypeNames.default_string,
+            .duration => constants.TypeNames.default_duration,
+            .byte_size => constants.TypeNames.default_size,
         };
     }
 
@@ -48,13 +54,15 @@ pub const ValueType = enum {
             .counter => constants.TypeNames.counter,
             .custom => constants.TypeNames.custom,
             .key_value => constants.TypeNames.key_value,
+            .duration => constants.TypeNames.duration,
+            .byte_size => constants.TypeNames.byte_size,
         };
     }
 
     /// Check if this type is numeric.
     pub fn isNumeric(self: ValueType) bool {
         return switch (self) {
-            .int, .uint, .float, .counter => true,
+            .int, .uint, .float, .counter, .duration, .byte_size => true,
             else => false,
         };
     }
@@ -372,6 +380,47 @@ pub const ParseResult = struct {
     /// Get count of positional arguments.
     pub fn positionalCount(self: *const ParseResult) usize {
         return self.positionals.items.len;
+    }
+
+    /// Get a counter value by name.
+    pub fn getCounter(self: *const ParseResult, name: []const u8) ?u32 {
+        const val = self.values.get(name) orelse return null;
+        return switch (val) {
+            .counter => |c| c,
+            else => null,
+        };
+    }
+
+    /// Get a duration value (in seconds) by name.
+    pub fn getDuration(self: *const ParseResult, name: []const u8) ?u64 {
+        const val = self.values.get(name) orelse return null;
+        return switch (val) {
+            .uint => |u| u,
+            .int => |i| if (i >= 0) @intCast(i) else null,
+            else => null,
+        };
+    }
+
+    /// Get a byte-size value (in bytes) by name.
+    pub fn getSize(self: *const ParseResult, name: []const u8) ?u64 {
+        const val = self.values.get(name) orelse return null;
+        return switch (val) {
+            .uint => |u| u,
+            .int => |i| if (i >= 0) @intCast(i) else null,
+            else => null,
+        };
+    }
+
+    /// Returns true if a subcommand was matched during parsing.
+    pub fn hasSubcommand(self: *const ParseResult) bool {
+        return self.subcommand != null;
+    }
+
+    /// Returns true if the argument was explicitly provided by the user
+    /// (i.e., present in the values map — includes defaults applied at parse time).
+    /// Use this when you need to distinguish between user-supplied and absent values.
+    pub fn isPresent(self: *const ParseResult, name: []const u8) bool {
+        return self.values.contains(name);
     }
 };
 

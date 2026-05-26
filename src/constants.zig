@@ -1,9 +1,12 @@
 //! Shared constants for args.zig.
+//! All user-visible strings, metavars, error messages, and config warning
+//! text live here so every module can reuse them without duplicating literals.
 
 pub const Defaults = struct {
     pub const program_name = "app";
     pub const error_prefix = "Error";
     pub const warning_prefix = "Warning";
+    pub const note_prefix = "Note";
     pub const unknown_version = "unknown";
     pub const verbose_name = "verbose";
     pub const quiet_name = "quiet";
@@ -26,6 +29,13 @@ pub const Defaults = struct {
     pub const select_key = "select";
     pub const all_key = "all";
     pub const all_keyword = "all";
+    // Duration / Size
+    pub const duration_name = "duration";
+    pub const duration_help = "Duration (e.g. 1h30m, 45s, 2d)";
+    pub const size_name = "size";
+    pub const size_help = "Byte size (e.g. 1GB, 512MB, 4096)";
+    pub const range_name = "value";
+    pub const range_help = "Integer in range";
 };
 
 pub const Metavars = struct {
@@ -55,6 +65,11 @@ pub const Metavars = struct {
     pub const uint = "UINT";
     pub const hex = "HEX";
     pub const list = "LIST";
+    pub const duration = "DURATION";
+    pub const byte_size = "SIZE";
+    pub const range = "N";
+    pub const regex = "PATTERN";
+    pub const slug = "SLUG";
 };
 
 pub const HelpText = struct {
@@ -70,6 +85,9 @@ pub const HelpText = struct {
     pub const env = "env";
     pub const negate = "negate";
     pub const deprecated = "DEPRECATED";
+    pub const conflicts_with_label = "conflicts";
+    pub const requires_label = "requires";
+    pub const range_label = "range";
 };
 
 pub const UpdateChecker = struct {
@@ -95,6 +113,8 @@ pub const ErrorMessages = struct {
     pub const parse_out_of_memory = "out of memory";
     pub const parse_overflow = "numeric overflow";
     pub const parse_invalid_character = "invalid character in value";
+    pub const parse_required_if_violation = "argument is required when another is present";
+    pub const parse_circular_conflict = "circular conflict detected between arguments";
 
     pub const schema_duplicate_argument = "duplicate argument";
     pub const schema_invalid_short = "invalid short name";
@@ -112,6 +132,9 @@ pub const ErrorMessages = struct {
     pub const schema_circular_dependency = "circular dependency";
     pub const schema_self_conflict = "argument conflicts with itself";
     pub const schema_out_of_memory = "out of memory";
+    pub const schema_conflicting_self = "argument cannot conflict with itself";
+    pub const schema_invalid_regex = "invalid regex pattern";
+    pub const schema_invalid_duration = "invalid duration format";
 
     pub const validation_out_of_range = "value out of range";
     pub const validation_too_short = "value is too short";
@@ -122,6 +145,15 @@ pub const ErrorMessages = struct {
     pub const validation_directory_not_found = "directory not found";
     pub const validation_permission_denied = "permission denied";
     pub const validation_invalid_path = "invalid path";
+    pub const validation_invalid_duration = "invalid duration format (use e.g. 1h30m, 45s, 2d)";
+    pub const validation_invalid_size = "invalid size format (use e.g. 1GB, 512MB, 4096)";
+    pub const validation_not_alphanumeric = "value must contain only letters and digits";
+    pub const validation_not_slug = "value must be lowercase alphanumeric with hyphens only";
+    pub const validation_has_whitespace = "value must not contain whitespace";
+    pub const validation_not_positive = "value must be a positive number (> 0)";
+    pub const validation_not_non_negative = "value must be a non-negative number (>= 0)";
+    pub const validation_min_length = "value is too short (minimum length not met)";
+    pub const validation_max_length = "value is too long (maximum length exceeded)";
 };
 
 pub const ParserMessages = struct {
@@ -133,6 +165,77 @@ pub const ParserMessages = struct {
     pub const unexpected_value = "Value '{s}' is unexpected for argument '{s}'. Expected one of: ";
     pub const did_you_mean = "\n\tDid you mean '{s}{s}'?\n";
     pub const hint = "\n\tHint: {s}\n";
+    pub const deprecated_option = "Option '--{s}' is deprecated: {s}\n";
+    pub const deprecated_option_no_msg = "Option '--{s}' is deprecated and may be removed in a future version\n";
+};
+
+/// Messages emitted when two arguments conflict at parse time.
+pub const ConflictMessages = struct {
+    pub const conflict_error = "Option '--{s}' cannot be used together with '--{s}'\n";
+    pub const mutual_exclusion_error = "Only one of the following options may be used: {s}\n";
+    pub const mutual_exclusion_used = "  --{s}\n";
+    pub const conflict_hint = "\n\tRemove one of the conflicting options and try again.\n";
+    pub const conflict_summary = "Conflicting arguments detected\n";
+};
+
+/// Messages emitted when a required dependency argument is missing.
+pub const DependencyMessages = struct {
+    pub const requires_error = "Option '--{s}' requires '--{s}' to also be provided\n";
+    pub const required_if_error = "Option '--{s}' is required when '--{s}' is provided\n";
+    pub const required_if_value_error = "Option '--{s}' is required when '--{s}' has value '{s}'\n";
+    pub const dependency_hint = "\n\tAdd the required option and try again.\n";
+    pub const circular_conflict_warn = "Warning: arguments '--{s}' and '--{s}' mutually conflict with each other\n";
+};
+
+/// Warnings emitted when config fields are inconsistent with each other.
+pub const ConfigWarnings = struct {
+    pub const permissive_exit_on_error =
+        "Config: 'exit_on_error = true' has no effect when 'parsing_mode = .permissive' — " ++
+        "unknown options are silently collected instead of causing an exit.";
+    pub const colors_silent_errors =
+        "Config: 'use_colors = true' wastes ANSI codes when 'silent_errors = true' — " ++
+        "consider setting 'use_colors = false' in silent mode.";
+    pub const suggest_zero_distance =
+        "Config: 'suggest_closest = true' but 'suggestion_max_distance = 0' — " ++
+        "no suggestions will ever be shown; set suggestion_max_distance >= 1.";
+    pub const negated_flags_strict =
+        "Config: 'allow_negated_flags = false' with 'parsing_mode = .strict' — " ++
+        "'--no-<flag>' tokens will trigger an UnknownOption error.";
+    pub const ignore_unknown_exit_on_error =
+        "Config: 'exit_on_error = true' is unused when 'parsing_mode = .ignore_unknown' — " ++
+        "unknown options are silently dropped.";
+    pub const update_check_silent =
+        "Config: 'check_for_updates = true' with 'silent_errors = true' — " ++
+        "update notifications will be suppressed; consider disabling update checks.";
+    pub const no_suggestion_candidates =
+        "Config: 'suggest_builtin_commands = false' and 'suggest_subcommands = false' — " ++
+        "suggestion engine has no candidates to offer; consider re-enabling at least one.";
+    pub const indent_exceeds_width =
+        "Config: 'help_indent' ({d}) is >= 'help_line_width' ({d}) — " ++
+        "descriptions will have no room; increase help_line_width or reduce help_indent.";
+    pub const auto_resolved_prefix = "[auto-resolved] ";
+};
+
+/// Messages for per-argument deprecation warnings.
+pub const DeprecationMessages = struct {
+    pub const deprecated_arg = "Warning: '--{s}' is deprecated. {s}\n";
+    pub const deprecated_arg_no_reason = "Warning: '--{s}' is deprecated and may be removed soon.\n";
+    pub const deprecated_positional = "Warning: positional argument '{s}' is deprecated. {s}\n";
+    pub const use_instead = "\n\tUse '--{s}' instead.\n";
+};
+
+/// Messages for new typed option features (duration, size, range).
+pub const FeatureMessages = struct {
+    pub const duration_help_suffix = " (format: 1h30m, 45s, 2d12h, etc.)";
+    pub const size_help_suffix = " (format: 1GB, 512MB, 1024KB, 4096, etc.)";
+    pub const range_help_suffix = " (range: {d}..{d})";
+    pub const range_help_suffix_min_only = " (min: {d})";
+    pub const range_help_suffix_max_only = " (max: {d})";
+    pub const invalid_duration_fmt = "invalid duration '{s}': expected format like '1h30m', '45s', '2d'\n";
+    pub const invalid_size_fmt = "invalid size '{s}': expected format like '1GB', '512MB', '4096'\n";
+    pub const out_of_range_fmt = "value {d} is out of range [{d}, {d}] for '--{s}'\n";
+    pub const out_of_range_min_fmt = "value {d} is below minimum {d} for '--{s}'\n";
+    pub const out_of_range_max_fmt = "value {d} exceeds maximum {d} for '--{s}'\n";
 };
 
 pub const PromptText = struct {
@@ -160,10 +263,14 @@ pub const TypeNames = struct {
     pub const counter = "N";
     pub const custom = "VALUE";
     pub const key_value = "KEY=VALUE";
+    pub const duration = "DURATION";
+    pub const byte_size = "SIZE";
 
     pub const default_string = "";
     pub const default_int = "0";
     pub const default_float = "0.0";
     pub const default_array = "[]";
     pub const default_bool = "false";
+    pub const default_duration = "0s";
+    pub const default_size = "0";
 };

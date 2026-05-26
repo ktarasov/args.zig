@@ -115,6 +115,7 @@ args.zig also provides reusable validators for common app and API inputs:
 - `Validators.intRange(min, max)`
 - `Validators.uintRange(min, max)`
 - `Validators.floatRange(min, max)`
+- `Validators.charRange(min_len, max_len)` — validates string character length ranges
 - `Validators.hexColor` / `Validators.hexColour` — validates hex color codes (`#RGB`, `#RRGGBB`, `#RGBA`, `#RRGGBBAA`)
 - `Validators.semver` — validates semantic version strings (`MAJOR.MINOR.PATCH`)
 - `Validators.base64` — validates base64 encoded strings
@@ -198,19 +199,37 @@ try parser.addEndpointOption("service", .{
     .default = "localhost:8080",
 });
 
-try parser.addOption("retries", .{
+try parser.addDurationOption("timeout", .{
+    .short = 't',
+    .default = "30s",
+    .help = "Task execution timeout (format: 1h30m, 45s)",
+});
+
+try parser.addSizeOption("buffer", .{
+    .short = 'b',
+    .default = "512MB",
+    .help = "Buffer size (format: 1GB, 512MB, 4096)",
+});
+
+try parser.addRangeOption("retries", i64, comptime .{
     .short = 'r',
-    .help = "Retry count (1-10)",
-    .value_type = .int,
-    .validator = args.Validators.intRange(1, 10),
+    .min = 1,
+    .max = 10,
     .default = "3",
+    .help = "Retry limit (range: 1..10)",
+});
+
+try parser.addCharRangeOption("username", .{
+    .short = 'u',
+    .min = 3,
+    .max = 12,
+    .help = "Username (range: 3..12 chars)",
 });
 ```
 
 ### Getting Values After Parse
 
-Most typed helper values are stored as strings, so retrieve them with `getString(...)`.
-For numeric options where you set `.value_type = .int`, use `getInt(...)`.
+Retrieve string values with `getString(...)`, integer options with `getInt(...)`, and custom duration / size parsed values with `getDuration(...)` / `getSize(...)`:
 
 ```zig
 var parsed = try parser.parseProcess(init);
@@ -218,7 +237,9 @@ defer parsed.deinit();
 
 const email = parsed.getString("email") orelse "";
 const service = parsed.getString("service") orelse "localhost:8080";
-const retries = parsed.getInt("retries") orelse 3;
+const timeout_secs = parsed.getDuration("timeout") orelse 30;
+const buffer_bytes = parsed.getSize("buffer") orelse 512 * 1024 * 1024;
+const retries = parsed.get("retries").?.asInt() orelse 3;
 ```
 
 ### CLI Example

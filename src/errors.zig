@@ -22,6 +22,10 @@ pub const ParseError = error{
     OutOfMemory,
     Overflow,
     InvalidCharacter,
+    /// An argument is required because another argument (or its value) is present.
+    RequiredIfViolation,
+    /// Two arguments that mutually conflict were both provided.
+    CircularConflict,
 };
 
 /// Errors that occur during schema definition.
@@ -42,6 +46,12 @@ pub const SchemaError = error{
     CircularDependency,
     SelfConflict,
     OutOfMemory,
+    /// Argument declared to conflict with itself.
+    ConflictingSelf,
+    /// Regex pattern could not be compiled.
+    InvalidRegex,
+    /// Duration format string is malformed.
+    InvalidDuration,
 };
 
 /// Errors that occur during value validation.
@@ -111,6 +121,8 @@ pub fn formatParseError(err: anyerror) []const u8 {
         error.OutOfMemory => constants.ErrorMessages.parse_out_of_memory,
         error.Overflow => constants.ErrorMessages.parse_overflow,
         error.InvalidCharacter => constants.ErrorMessages.parse_invalid_character,
+        error.RequiredIfViolation => constants.ErrorMessages.parse_required_if_violation,
+        error.CircularConflict => constants.ErrorMessages.parse_circular_conflict,
         else => @errorName(err),
     };
 }
@@ -134,7 +146,26 @@ pub fn formatSchemaError(err: SchemaError) []const u8 {
         SchemaError.CircularDependency => constants.ErrorMessages.schema_circular_dependency,
         SchemaError.SelfConflict => constants.ErrorMessages.schema_self_conflict,
         SchemaError.OutOfMemory => constants.ErrorMessages.schema_out_of_memory,
+        SchemaError.ConflictingSelf => constants.ErrorMessages.schema_conflicting_self,
+        SchemaError.InvalidRegex => constants.ErrorMessages.schema_invalid_regex,
+        SchemaError.InvalidDuration => constants.ErrorMessages.schema_invalid_duration,
     };
+}
+
+/// Format a parse error with additional context into an allocated string.
+/// The caller is responsible for freeing the returned slice.
+pub fn formatParseErrorDetail(allocator: std.mem.Allocator, err: anyerror, ctx: ErrorContext) ![]const u8 {
+    var aw: std.Io.Writer.Allocating = .init(allocator);
+    errdefer aw.deinit();
+    const w = &aw.writer;
+    try w.writeAll(formatParseError(err));
+    const detail = try ctx.format(allocator);
+    defer allocator.free(detail);
+    if (detail.len > 0) {
+        try w.writeAll(": ");
+        try w.writeAll(detail);
+    }
+    return aw.toOwnedSlice();
 }
 
 /// Format a validation error for display.

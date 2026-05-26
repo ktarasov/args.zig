@@ -961,6 +961,117 @@ try parser.addMultiple("numbers", .{
 });
 ```
 
+### `addDurationOption`
+
+```zig
+pub fn addDurationOption(self: *ArgumentParser, name: []const u8, options: struct {
+    short: ?u8 = null,
+    help: ?[]const u8 = null,
+    default: ?[]const u8 = null,
+    required: bool = false,
+    dest: ?[]const u8 = null,
+    env_var: ?[]const u8 = null,
+    hidden: bool = false,
+    aliases: []const []const u8 = &.{},
+    deprecated: ?[]const u8 = null,
+}) !void
+```
+
+Adds an option that accepts and validates duration strings (e.g. `1h30m`, `45s`, `2d`). Stored value is parsed into total seconds (`u64`).
+
+**Example:**
+```zig
+try parser.addDurationOption("timeout", .{
+    .short = 't',
+    .default = "30s",
+});
+```
+
+### `addSizeOption`
+
+```zig
+pub fn addSizeOption(self: *ArgumentParser, name: []const u8, options: struct {
+    short: ?u8 = null,
+    help: ?[]const u8 = null,
+    default: ?[]const u8 = null,
+    required: bool = false,
+    dest: ?[]const u8 = null,
+    env_var: ?[]const u8 = null,
+    hidden: bool = false,
+    aliases: []const []const u8 = &.{},
+    deprecated: ?[]const u8 = null,
+}) !void
+```
+
+Adds an option that accepts and validates byte-size strings (e.g. `512MB`, `1GB`, `4096`). Stored value is parsed into total bytes (`u64`).
+
+**Example:**
+```zig
+try parser.addSizeOption("buffer", .{
+    .short = 'b',
+    .default = "64MB",
+});
+```
+
+### `addRangeOption`
+
+```zig
+pub fn addRangeOption(self: *ArgumentParser, name: []const u8, comptime T: type, comptime options: struct {
+    short: ?u8 = null,
+    help: ?[]const u8 = null,
+    default: ?[]const u8 = null,
+    required: bool = false,
+    dest: ?[]const u8 = null,
+    env_var: ?[]const u8 = null,
+    hidden: bool = false,
+    aliases: []const []const u8 = &.{},
+    deprecated: ?[]const u8 = null,
+    min: ?T = null,
+    max: ?T = null,
+}) !void
+```
+
+Adds a range-validated option supporting both integer and floating-point types.
+
+**Example:**
+```zig
+try parser.addRangeOption("concurrency", i64, comptime .{
+    .short = 'c',
+    .min = 1,
+    .max = 8,
+    .default = "2",
+});
+```
+
+### `addCharRangeOption`
+
+```zig
+pub fn addCharRangeOption(self: *ArgumentParser, name: []const u8, comptime options: struct {
+    short: ?u8 = null,
+    help: ?[]const u8 = null,
+    default: ?[]const u8 = null,
+    required: bool = false,
+    dest: ?[]const u8 = null,
+    env_var: ?[]const u8 = null,
+    hidden: bool = false,
+    aliases: []const []const u8 = &.{},
+    deprecated: ?[]const u8 = null,
+    min: ?usize = null,
+    max: ?usize = null,
+}) !void
+```
+
+Adds an option validated by character length range (minimum and maximum character count).
+
+**Example:**
+```zig
+try parser.addCharRangeOption("username", .{
+    .short = 'u',
+    .min = 3,
+    .max = 12,
+});
+```
+
 ### `setGroup`
 
 ```zig
@@ -1328,6 +1439,46 @@ pub fn contains(self: *const ParseResult, name: []const u8) bool
 ```
 
 Checks if a value exists.
+
+#### `getKeyValue`
+
+```zig
+pub fn getKeyValue(self: *const ParseResult, name: []const u8) ?KeyValue
+```
+
+Gets a parsed `KeyValue` pair value (returned by `addKeyValueOption`).
+
+#### `getDuration`
+
+```zig
+pub fn getDuration(self: *const ParseResult, name: []const u8) ?u64
+```
+
+Gets the parsed duration in seconds (returned by `addDurationOption`).
+
+#### `getSize`
+
+```zig
+pub fn getSize(self: *const ParseResult, name: []const u8) ?u64
+```
+
+Gets the parsed byte-size in bytes (returned by `addSizeOption`).
+
+#### `hasSubcommand`
+
+```zig
+pub fn hasSubcommand(self: *const ParseResult) bool
+```
+
+Checks whether a subcommand was successfully matched and parsed.
+
+#### `isPresent`
+
+```zig
+pub fn isPresent(self: *const ParseResult, name: []const u8) bool
+```
+
+Checks if an argument was explicitly provided (either by user input or active defaults applied at parse time).
 
 #### `deinit`
 

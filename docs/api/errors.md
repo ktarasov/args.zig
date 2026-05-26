@@ -35,6 +35,8 @@ Errors that occur during argument parsing:
 | `OutOfMemory` | Memory allocation failed |
 | `Overflow` | Numeric value too large |
 | `InvalidCharacter` | Invalid character in value |
+| `RequiredIfViolation` | Argument is required when another is present |
+| `CircularConflict` | Circular conflict detected between arguments |
 
 ## SchemaError
 
@@ -52,6 +54,9 @@ Errors that occur during schema definition:
 | `InvalidChoices` | Choices don't match value type |
 | `CircularDependency` | Dependency creates a cycle |
 | `SelfConflict` | Argument conflicts with itself |
+| `ConflictingSelf` | Argument declared to conflict with itself |
+| `InvalidRegex` | Regex pattern could not be compiled |
+| `InvalidDuration` | Duration format string is malformed |
 
 ## ValidationError
 
@@ -99,6 +104,27 @@ std.debug.print("{s}\n", .{errors.formatValidationError(errors.ValidationError.I
 ```
 
 These helpers keep CLI error output consistent while still letting applications decide how to display or decorate the message.
+
+### Detailed Formatting with Context
+
+For advanced error reporting, use `formatParseErrorDetail`, which formats an error using context provided in an `ErrorContext` struct:
+
+```zig
+const errors = @import("args").errors;
+
+const ctx = errors.ErrorContext{
+    .argument = "output",
+    .message = "file not found",
+    .value = "/invalid/path",
+    .suggestion = "output.txt",
+};
+
+const formatted = try errors.formatParseErrorDetail(allocator, error.InvalidValue, ctx);
+defer allocator.free(formatted);
+std.debug.print("{s}\n", .{formatted});
+// Output: invalid value: argument 'output': file not found (got '/invalid/path')
+//         Did you mean 'output.txt'?
+```
 
 ### Duplicate Option Behavior
 

@@ -143,7 +143,7 @@ To fully disable color codes, set `use_colors = false` (all theme fields are ign
 
 ### Default Configuration
 
-All features enabled:
+All features enabled, strict parsing, and standard theme:
 
 ```zig
 var parser = try args.ArgumentParser.init(allocator, .{
@@ -154,7 +154,7 @@ var parser = try args.ArgumentParser.init(allocator, .{
 
 ### Minimal Configuration
 
-No colors, no updates, no exit on error:
+No colors, no updates, no exit on error, and silent:
 
 ```zig
 var parser = try args.ArgumentParser.init(allocator, .{
@@ -165,12 +165,56 @@ var parser = try args.ArgumentParser.init(allocator, .{
 
 ### Verbose Configuration
 
-Extra debugging information:
+Extra debugging information showing all defaults and env vars:
 
 ```zig
 var parser = try args.ArgumentParser.init(allocator, .{
     .name = "myapp",
     .config = args.Config.verbose(),
+});
+```
+
+### Colorful Configuration
+
+Forces colorful output with a bright preconfigured color theme:
+
+```zig
+var parser = try args.ArgumentParser.init(allocator, .{
+    .name = "myapp",
+    .config = args.Config.colorful(),
+});
+```
+
+### Testing Configuration
+
+Specifically configured for unit tests. Suppresses errors, disables updates and exit behavior:
+
+```zig
+var parser = try args.ArgumentParser.init(allocator, .{
+    .name = "myapp",
+    .config = args.Config.testing(),
+});
+```
+
+### CI Configuration
+
+Strict mode, exit on error, spelling suggestions, but disables all color codes (pipe-safe) and update checks:
+
+```zig
+var parser = try args.ArgumentParser.init(allocator, .{
+    .name = "myapp",
+    .config = args.Config.ci(),
+});
+```
+
+### Production Configuration
+
+Enforces color themes, automatic update notifications, spelling suggestions, and exit on error:
+
+```zig
+var parser = try args.ArgumentParser.init(allocator, .{
+    .name = "myapp",
+    .config = args.Config.production(),
 });
 ```
 
@@ -317,4 +361,102 @@ When disabled, `--no-<name>` is treated as unknown.
 
 ```zig
 .config = .{ .allow_negated_flags = false }
+```
+
+## Configuration Validation & Auto-Resolution
+
+args.zig includes a built-in static analysis engine for configuration to detect conflicting or redundant flags at runtime and auto-resolve them safely.
+
+### Config Warnings & Severity
+
+```zig
+pub const ConfigWarningSeverity = enum {
+    note,
+    warning,
+    @"error",
+};
+
+pub const ConfigWarning = struct {
+    field: []const u8,
+    message: []const u8,
+    severity: ConfigWarningSeverity = .warning,
+    auto_resolved: bool = false,
+};
+```
+
+### Validate Config Combinations
+
+Call `validate` to check a configuration struct for inconsistent options:
+
+```zig
+var warn_buf: [16]args.config.ConfigWarning = undefined;
+const count = config.validate(&warn_buf);
+```
+
+### Auto-Resolve Conflicts
+
+You can obtain a safe, auto-resolved copy of any configuration by calling `autoResolve()`:
+
+```zig
+const conflicting_config = args.Config{
+    .parsing_mode = .permissive,
+    .exit_on_error = true, // Conflict: exit_on_error has no effect in permissive
+};
+
+const clean_config = conflicting_config.autoResolve();
+// clean_config.exit_on_error is now false
+```
+
+## Configuration Utility Methods
+
+### Config Merging
+
+You can shallow-merge two configurations using `.merge()`. Fields from the patch override default fields of the base:
+
+```zig
+const base = args.Config.default();
+const patch = args.Config{ .use_colors = false };
+
+const merged = base.merge(patch);
+// merged.use_colors is now false, while other fields remain default
+```
+
+### Config Snapshots
+
+Generate a perfect duplicate snapshot of the current configuration:
+
+```zig
+const copy = cfg.snapshot();
+```
+
+## Global Auto-Resolution & Utilities
+
+Use these global functions to manage shared behavior across multiple parsers:
+
+### Auto-Resolving Initialization
+
+Initialize the global configuration, print colored warning messages to `stderr` for any conflicts, and apply resolved changes:
+
+```zig
+args.initConfigAutoResolve(.{
+    .parsing_mode = .permissive,
+    .exit_on_error = true,
+});
+```
+
+### Set Config Field Globally
+
+Directly mutate a single global configuration value:
+
+```zig
+args.setConfigValue("use_colors", false);
+```
+
+### Validate Global Config
+
+Validate the currently active global configuration at runtime:
+
+```zig
+var buf: [16]args.config.ConfigWarning = undefined;
+const count = args.validateConfig(&buf);
 ```

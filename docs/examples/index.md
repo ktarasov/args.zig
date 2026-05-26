@@ -907,6 +907,119 @@ export MYAPP_DB_PORT=5432
 env-demo
 ```
 
+## Advanced Argument Relations Example
+
+Demonstrates mutual exclusion, conditional requirements, and dependencies between options and flags:
+
+```zig
+const std = @import("std");
+const args = @import("args");
+
+pub fn main() !void {
+    const allocator = std.heap.page_allocator;
+
+    var ap = try args.createParser(allocator, "conflict-demo");
+    defer ap.deinit();
+
+    ap.description = "Advanced argument validation and relations (conflicts/requires/exclusions)";
+
+    try ap.addFlag("mysql", .{ .help = "Use MySQL backend" });
+    try ap.addFlag("postgres", .{ .help = "Use PostgreSQL backend" });
+    try ap.addOption("host", .{ .help = "Server host address" });
+    try ap.addOption("port", .{ .help = "Server port" });
+    try ap.addOption("user", .{ .help = "Username" });
+    try ap.addOption("password", .{ .help = "Password" });
+
+    // Exclude MySQL and Postgres backends from being used together
+    try ap.addMutualExclusion(&[_][]const u8{ "mysql", "postgres" });
+
+    // Host and user are conditionally required when backends are active
+    try ap.addRequiredIf("host", "mysql", null);
+    try ap.addRequiredIf("host", "postgres", null);
+    try ap.addRequiredIf("user", "mysql", null);
+    try ap.addRequiredIf("user", "postgres", null);
+
+    // Password requires username
+    try ap.addRequires("password", "user");
+
+    var init = std.process.Init.init;
+    var result = ap.parseProcess(init) catch |err| {
+        std.debug.print("Failed to parse arguments: {any}\n", .{err});
+        return;
+    };
+    defer result.deinit();
+
+    std.debug.print("Validated database configuration!\n", .{});
+}
+```
+
+## Configuration Warnings & Auto-Resolution Example
+
+Demonstrates checking configuration consistency at runtime and automatically resolving any conflicts:
+
+```zig
+const std = @import("std");
+const args = @import("args");
+
+pub fn main() !void {
+    const allocator = std.heap.page_allocator;
+
+    const cfg = args.Config{
+        .parsing_mode = .permissive,
+        .exit_on_error = true,
+        .use_colors = true,
+        .silent_errors = true,
+        .suggest_closest = true,
+        .suggestion_max_distance = 0,
+    };
+
+    var ap = try args.createParserWithConfig(allocator, "config-warnings-demo", cfg);
+    defer ap.deinit();
+
+    var warn_buf: [16]args.config.ConfigWarning = undefined;
+    const count = ap.getConfigWarnings(&warn_buf);
+
+    std.debug.print("Detected {d} configuration conflicts:\n", .{count});
+    for (warn_buf[0..count], 1..) |warn, idx| {
+        std.debug.print("{d}. [{s}] {s}\n", .{ idx, warn.field, warn.message });
+    }
+
+    ap.configureAutoResolve();
+    std.debug.print("Resolved Config color mode: {}\n", .{ap.cfg.use_colors});
+}
+```
+
+## Duration, Byte-Size, & Range Validation Example
+
+Demonstrates options parsing duration formats (e.g. `1h30m`), byte sizes (e.g. `512MB`), or range-bounded numbers:
+
+```zig
+const std = @import("std");
+const args = @import("args");
+
+pub fn main() !void {
+    const allocator = std.heap.page_allocator;
+
+    var ap = try args.createParser(allocator, "duration-size-demo");
+    defer ap.deinit();
+
+    try ap.addDurationOption("timeout", .{ .default = "30s" });
+    try ap.addSizeOption("buffer-size", .{ .default = "64MB" });
+    try ap.addRangeOption("concurrency", i64, comptime .{ .min = 1, .max = 8, .default = "2" });
+
+    var init = std.process.Init.init;
+    var result = ap.parseProcess(init) catch |err| {
+        std.debug.print("Argument validation failed: {any}\n", .{err});
+        return;
+    };
+    defer result.deinit();
+
+    std.debug.print("Timeout seconds: {d}\n", .{result.getDuration("timeout").?});
+    std.debug.print("Buffer bytes: {d}\n", .{result.getSize("buffer-size").?});
+    std.debug.print("Concurrency: {d}\n", .{result.get("concurrency").?.asInt().?});
+}
+```
+
 ## Running the Examples
 
 Build and run examples with:
@@ -920,6 +1033,15 @@ zig build run-basic
 
 # Run advanced example
 zig build run-advanced
+
+# Run conflict demo example
+zig build run-conflict_demo
+
+# Run config warnings example
+zig build run-config_warnings
+
+# Run duration and size example
+zig build run-duration_size
 
 # Run typed numeric options
 zig build run-int_float_options

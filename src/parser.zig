@@ -164,6 +164,11 @@ pub const Parser = struct {
 
         try self.processEnvVars(&result);
         try self.validateRequired(&result);
+        self.validateDeprecations(&result);
+        try self.validateConflicts(&result);
+        try self.validateRequires(&result);
+        try self.validateRequiredIf(&result);
+        try self.validateMutualExclusions(&result);
         try self.validateGroups(&result);
         return result;
     }
@@ -838,10 +843,229 @@ pub const Parser = struct {
         return .{ .array = buf[0..count] };
     }
 
+    fn findArgSpec(self: *const Parser, name: []const u8) ?ArgSpec {
+        for (self.spec.args) |arg| {
+            if (std.mem.eql(u8, arg.name, name)) return arg;
+            if (arg.long) |l| {
+                if (std.mem.eql(u8, l, name)) return arg;
+            }
+            if (arg.dest) |d| {
+                if (std.mem.eql(u8, d, name)) return arg;
+            }
+        }
+        return null;
+    }
+
     fn validateRequired(self: *Parser, result: *ParseResult) !void {
         for (self.spec.args) |arg| {
             if (arg.required and !result.contains(arg.getDestination())) {
                 return errors.ParseError.MissingRequired;
+            }
+        }
+    }
+
+    fn validateDeprecations(self: *Parser, result: *ParseResult) void {
+        for (self.spec.args) |arg| {
+            if (arg.deprecated) |reason| {
+                if (result.contains(arg.getDestination())) {
+                    if (arg.positional) {
+                        self.emitWarning(constants.DeprecationMessages.deprecated_positional, .{ arg.name, reason });
+                    } else {
+                        if (reason.len > 0) {
+                            self.emitWarning(constants.DeprecationMessages.deprecated_arg, .{ arg.name, reason });
+                        } else {
+                            self.emitWarning(constants.DeprecationMessages.deprecated_arg_no_reason, .{arg.name});
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn validateConflicts(self: *Parser, result: *ParseResult) !void {
+        for (self.spec.args) |arg| {
+            if (result.contains(arg.getDestination())) {
+                for (arg.conflicts_with) |conflict_name| {
+                    if (self.findArgSpec(conflict_name)) |conflict_arg| {
+                        if (result.contains(conflict_arg.getDestination())) {
+                            // Check for circular conflict
+                            var is_circular = false;
+                            for (conflict_arg.conflicts_with) |c_name| {
+                                if (std.mem.eql(u8, c_name, arg.name) or
+                                    (arg.long != null and std.mem.eql(u8, c_name, arg.long.?)))
+                                {
+                                    is_circular = true;
+                                    break;
+                                }
+                            }
+
+                            if (is_circular) {
+                                self.emitError(constants.DependencyMessages.circular_conflict_warn, .{ arg.name, conflict_arg.name });
+                                if (self.cfg.exit_on_error) std.process.exit(1);
+                                return errors.ParseError.CircularConflict;
+                            } else {
+                                self.emitError(constants.ConflictMessages.conflict_error, .{ arg.name, conflict_arg.name });
+                                if (!self.cfg.silent_errors) {
+                                    std.debug.print(constants.ConflictMessages.conflict_hint, .{});
+                                }
+                                if (self.cfg.exit_on_error) std.process.exit(1);
+                                return errors.ParseError.ConflictingArguments;
+                            }
+                        }
+                    } else {
+                        if (result.contains(conflict_name)) {
+                            self.emitError(constants.ConflictMessages.conflict_error, .{ arg.name, conflict_name });
+                            if (!self.cfg.silent_errors) {
+                                std.debug.print(constants.ConflictMessages.conflict_hint, .{});
+                            }
+                            if (self.cfg.exit_on_error) std.process.exit(1);
+                            return errors.ParseError.ConflictingArguments;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn validateRequires(self: *Parser, result: *ParseResult) !void {
+        for (self.spec.args) |arg| {
+            if (result.contains(arg.getDestination())) {
+                for (arg.requires) |req_name| {
+                    var found = false;
+                    if (self.findArgSpec(req_name)) |req_arg| {
+                        if (result.contains(req_arg.getDestination())) {
+                            found = true;
+                        }
+                    } else {
+                        if (result.contains(req_name)) {
+                            found = true;
+                        }
+                    }
+
+                    if (!found) {
+                        self.emitError(constants.DependencyMessages.requires_error, .{ arg.name, req_name });
+                        if (!self.cfg.silent_errors) {
+                            std.debug.print(constants.DependencyMessages.dependency_hint, .{});
+                        }
+                        if (self.cfg.exit_on_error) std.process.exit(1);
+                        return errors.ParseError.MissingDependency;
+                    }
+                }
+            }
+        }
+    }
+
+    fn validateRequiredIf(self: *Parser, result: *ParseResult) !void {
+        for (self.spec.args) |arg| {
+            for (arg.required_if) |req| {
+                var triggered = false;
+                if (self.findArgSpec(req.when_arg)) |when_spec| {
+                    const dest = when_spec.getDestination();
+                    if (result.contains(dest)) {
+                        if (req.when_value) |val| {
+                            if (result.values.get(dest)) |p_val| {
+                                var p_val_str_buf: [128]u8 = undefined;
+                                const p_val_str = blk: {
+                                    switch (p_val) {
+                                        .string => |s| break :blk s,
+                                        .int => |i| break :blk std.fmt.bufPrint(&p_val_str_buf, "{d}", .{i}) catch "",
+                                        .uint => |u| break :blk std.fmt.bufPrint(&p_val_str_buf, "{d}", .{u}) catch "",
+                                        .float => |f| break :blk std.fmt.bufPrint(&p_val_str_buf, "{d}", .{f}) catch "",
+                                        .boolean => |b| break :blk if (b) "true" else "false",
+                                        .counter => |c| break :blk std.fmt.bufPrint(&p_val_str_buf, "{d}", .{c}) catch "",
+                                        else => break :blk "",
+                                    }
+                                };
+                                if (std.mem.eql(u8, p_val_str, val)) {
+                                    triggered = true;
+                                }
+                            }
+                        } else {
+                            triggered = true;
+                        }
+                    }
+                } else {
+                    if (result.contains(req.when_arg)) {
+                        if (req.when_value) |val| {
+                            if (result.values.get(req.when_arg)) |p_val| {
+                                var p_val_str_buf: [128]u8 = undefined;
+                                const p_val_str = blk: {
+                                    switch (p_val) {
+                                        .string => |s| break :blk s,
+                                        .int => |i| break :blk std.fmt.bufPrint(&p_val_str_buf, "{d}", .{i}) catch "",
+                                        .uint => |u| break :blk std.fmt.bufPrint(&p_val_str_buf, "{d}", .{u}) catch "",
+                                        .float => |f| break :blk std.fmt.bufPrint(&p_val_str_buf, "{d}", .{f}) catch "",
+                                        .boolean => |b| break :blk if (b) "true" else "false",
+                                        .counter => |c| break :blk std.fmt.bufPrint(&p_val_str_buf, "{d}", .{c}) catch "",
+                                        else => break :blk "",
+                                    }
+                                };
+                                if (std.mem.eql(u8, p_val_str, val)) {
+                                    triggered = true;
+                                }
+                            }
+                        } else {
+                            triggered = true;
+                        }
+                    }
+                }
+
+                if (triggered and !result.contains(arg.getDestination())) {
+                    if (req.when_value) |val| {
+                        self.emitError(constants.DependencyMessages.required_if_value_error, .{ arg.name, req.when_arg, val });
+                    } else {
+                        self.emitError(constants.DependencyMessages.required_if_error, .{ arg.name, req.when_arg });
+                    }
+                    if (!self.cfg.silent_errors) {
+                        std.debug.print(constants.DependencyMessages.dependency_hint, .{});
+                    }
+                    if (self.cfg.exit_on_error) std.process.exit(1);
+                    return errors.ParseError.RequiredIfViolation;
+                }
+            }
+        }
+    }
+
+    fn validateMutualExclusions(self: *Parser, result: *ParseResult) !void {
+        for (self.spec.mutual_exclusions) |group| {
+            var found_count: usize = 0;
+            for (group) |name| {
+                var is_present = false;
+                if (self.findArgSpec(name)) |spec| {
+                    if (result.contains(spec.getDestination())) {
+                        is_present = true;
+                    }
+                } else {
+                    if (result.contains(name)) {
+                        is_present = true;
+                    }
+                }
+
+                if (is_present) {
+                    found_count += 1;
+                }
+            }
+
+            if (found_count > 1) {
+                var options_buf: [512]u8 = undefined;
+                var offset: usize = 0;
+                for (group, 0..) |name, idx| {
+                    const printed = std.fmt.bufPrint(options_buf[offset..], "--{s}", .{name}) catch "";
+                    offset += printed.len;
+                    if (idx < group.len - 1 and offset + 2 <= options_buf.len) {
+                        @memcpy(options_buf[offset .. offset + 2], ", ");
+                        offset += 2;
+                    }
+                }
+                const formatted = options_buf[0..offset];
+
+                self.emitError(constants.ConflictMessages.mutual_exclusion_error, .{formatted});
+
+                if (!self.cfg.silent_errors) {
+                    std.debug.print(constants.ConflictMessages.conflict_hint, .{});
+                }
+                if (self.cfg.exit_on_error) std.process.exit(1);
+                return errors.ParseError.MutuallyExclusive;
             }
         }
     }

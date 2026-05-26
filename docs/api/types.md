@@ -9,7 +9,19 @@ head:
 
 # Types Reference
 
-This document covers all core types in args.zig.
+This document covers all core types and compile-time version constants in args.zig.
+
+## Version Information
+
+The library exposes the following compile-time constants for versioning:
+
+```zig
+pub const VERSION = "0.0.6";
+pub const VERSION_MAJOR = 0;
+pub const VERSION_MINOR = 0;
+pub const VERSION_PATCH = 6;
+pub const MINIMUM_ZIG_VERSION = "0.16.0";
+```
 
 ## ValueType
 
@@ -27,6 +39,9 @@ pub const ValueType = enum {
     array,      // Multiple values
     counter,    // Incremented count
     custom,     // Custom type with validator
+    key_value,  // Key=Value pair
+    duration,   // Duration string (e.g. 1h30m) parsed into u64 seconds
+    byte_size,  // Byte size string (e.g. 512MB) parsed into u64 bytes
 };
 ```
 
@@ -52,6 +67,7 @@ pub const ArgAction = enum {
     help,         // Print help and exit
     version,      // Print version and exit
     callback,     // Call custom function
+    callback_flag, // Call custom function when flag is set (requires no value)
     extend,       // Extend array with values
 };
 ```
@@ -112,7 +128,13 @@ pub const ParsedValue = union(enum) {
     boolean: bool,
     array: []const []const u8,
     counter: u32,
+    key_value: KeyValue,
     none: void,
+};
+
+pub const KeyValue = struct {
+    key: []const u8,
+    value: []const u8,
 };
 ```
 
@@ -126,6 +148,7 @@ pub const ParsedValue = union(enum) {
 | `asFloat()` | `?f64` | Try to get as float |
 | `asBool()` | `?bool` | Try to get as boolean |
 | `asString()` | `?[]const u8` | Try to get as string |
+| `asKeyValue()` | `?KeyValue` | Try to get as key-value pair |
 
 ## ArgSpec
 

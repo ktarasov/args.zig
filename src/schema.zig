@@ -11,6 +11,15 @@ pub const DecodeMode = types.DecodeMode;
 pub const Nargs = types.Nargs;
 pub const ParsedValue = types.ParsedValue;
 
+/// Specifies a conditional requirement: `arg` is required when `when_arg` is
+/// present (optionally only when `when_arg` has a specific `when_value`).
+pub const RequiredIf = struct {
+    /// The argument that triggers this requirement.
+    when_arg: []const u8,
+    /// If non-null, the requirement only applies when `when_arg` has this value.
+    when_value: ?[]const u8 = null,
+};
+
 /// Derives specific arguments from a struct type.
 pub fn deriveOptions(comptime T: type) []const ArgSpec {
     if (@typeInfo(T) != .@"struct") @compileError("deriveOptions requires a struct type, found " ++ @typeName(T));
@@ -99,11 +108,17 @@ pub const ArgSpec = struct {
     deprecated: ?[]const u8 = null,
     validator: ?validation.ValidatorFn = null,
     callback: ?CallbackFn = null,
-    expect: []const []const u8 = &.{}, // Add expect field for allowed values validation
+    expect: []const []const u8 = &.{},
     suggestion_hint: ?[]const u8 = null,
     custom_error_message: ?[]const u8 = null,
     decode_mode: DecodeMode = .none,
     separator: u8 = 0,
+    /// Names of other arguments this arg conflicts with (cannot be used together).
+    conflicts_with: []const []const u8 = &.{},
+    /// Names of other arguments that MUST also be present when this arg is given.
+    requires: []const []const u8 = &.{},
+    /// Conditions under which this argument becomes required.
+    required_if: []const RequiredIf = &.{},
 
     /// Get the destination name for storing the value.
     pub fn getDestination(self: *const ArgSpec) []const u8 {
@@ -181,6 +196,10 @@ pub const CommandSpec = struct {
     allow_interspersed: bool = true,
     add_help: bool = true,
     add_version: bool = true,
+    /// Groups of mutually exclusive argument names.
+    /// Each inner slice is one exclusion group: at most one arg from that group
+    /// may be provided at parse time.
+    mutual_exclusions: []const []const []const u8 = &.{},
 
     /// Get required arguments count.
     pub fn requiredArgCount(self: *const CommandSpec) usize {

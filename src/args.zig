@@ -43,6 +43,10 @@ pub const ColorTheme = utils.ColorTheme;
 
 // Version information
 pub const VERSION = version_info.version;
+pub const VERSION_MAJOR = 0;
+pub const VERSION_MINOR = 0;
+pub const VERSION_PATCH = 6;
+pub const MINIMUM_ZIG_VERSION = "0.16.0";
 
 fn pickExtensionValidator(
     comptime allowed_extensions: []const []const u8,
@@ -80,6 +84,10 @@ pub const ArgumentParser = struct {
     args: std.ArrayList(ArgSpec),
     groups: std.ArrayList(ArgumentGroup),
     subcommands: std.ArrayList(SubcommandSpec),
+    mutual_exclusions: std.ArrayList([]const []const u8),
+    allocated_strings: std.ArrayList([]const u8),
+    allocated_slices_u8: std.ArrayList([][]const u8),
+    allocated_slices_req: std.ArrayList([]schema.RequiredIf),
     current_group: ?*ArgumentGroup = null,
     add_help: bool = true,
     add_version: bool = true,
@@ -117,6 +125,10 @@ pub const ArgumentParser = struct {
             .args = .empty,
             .groups = .empty,
             .subcommands = .empty,
+            .mutual_exclusions = .empty,
+            .allocated_strings = .empty,
+            .allocated_slices_u8 = .empty,
+            .allocated_slices_req = .empty,
             .add_help = options.add_help,
             .add_version = options.add_version,
             .cfg = cfg,
@@ -134,6 +146,20 @@ pub const ArgumentParser = struct {
         for (self.groups.items) |*g| g.deinit(self.allocator);
         self.groups.deinit(self.allocator);
         self.subcommands.deinit(self.allocator);
+        for (self.mutual_exclusions.items) |group| {
+            for (group) |name| {
+                self.allocator.free(name);
+            }
+            self.allocator.free(group);
+        }
+        self.mutual_exclusions.deinit(self.allocator);
+
+        for (self.allocated_strings.items) |str| self.allocator.free(str);
+        self.allocated_strings.deinit(self.allocator);
+        for (self.allocated_slices_u8.items) |slice| self.allocator.free(slice);
+        self.allocated_slices_u8.deinit(self.allocator);
+        for (self.allocated_slices_req.items) |slice| self.allocator.free(slice);
+        self.allocated_slices_req.deinit(self.allocator);
     }
 
     /// Adds a fully specified argument to the parser.
@@ -1750,6 +1776,7 @@ pub const ArgumentParser = struct {
             .epilog = self.epilog,
             .add_help = self.add_help,
             .add_version = self.add_version,
+            .mutual_exclusions = self.mutual_exclusions.items,
         };
     }
 
@@ -1900,6 +1927,249 @@ pub const ArgumentParser = struct {
             .required = options.required,
         });
         self.current_group = &self.groups.items[self.groups.items.len - 1];
+    }
+
+    fn findArgSpecMut(self: *ArgumentParser, name: []const u8) ?*ArgSpec {
+        for (self.args.items) |*arg| {
+            if (std.mem.eql(u8, arg.name, name)) return arg;
+            if (arg.long) |l| {
+                if (std.mem.eql(u8, l, name)) return arg;
+            }
+            if (arg.dest) |d| {
+                if (std.mem.eql(u8, d, name)) return arg;
+            }
+        }
+        return null;
+    }
+
+    /// Declares a mutual conflict between two arguments: neither can be used if the other is present.
+    pub fn addConflict(self: *ArgumentParser, arg_name: []const u8, conflict_name: []const u8) !void {
+        const arg1 = self.findArgSpecMut(arg_name) orelse return error.InvalidArgument;
+
+        const new_len1 = arg1.conflicts_with.len + 1;
+        const new_slice1 = try self.allocator.alloc([]const u8, new_len1);
+        try self.allocated_slices_u8.append(self.allocator, new_slice1);
+        @memcpy(new_slice1[0..arg1.conflicts_with.len], arg1.conflicts_with);
+        const duped_str1 = try self.allocator.dupe(u8, conflict_name);
+        try self.allocated_strings.append(self.allocator, duped_str1);
+        new_slice1[arg1.conflicts_with.len] = duped_str1;
+        arg1.conflicts_with = new_slice1;
+
+        if (self.findArgSpecMut(conflict_name)) |arg2| {
+            const new_len2 = arg2.conflicts_with.len + 1;
+            const new_slice2 = try self.allocator.alloc([]const u8, new_len2);
+            try self.allocated_slices_u8.append(self.allocator, new_slice2);
+            @memcpy(new_slice2[0..arg2.conflicts_with.len], arg2.conflicts_with);
+            const duped_str2 = try self.allocator.dupe(u8, arg_name);
+            try self.allocated_strings.append(self.allocator, duped_str2);
+            new_slice2[arg2.conflicts_with.len] = duped_str2;
+            arg2.conflicts_with = new_slice2;
+        }
+    }
+
+    /// Declares a requirement: `arg_name` requires `required_name` to also be provided.
+    pub fn addRequires(self: *ArgumentParser, arg_name: []const u8, required_name: []const u8) !void {
+        const arg = self.findArgSpecMut(arg_name) orelse return error.InvalidArgument;
+
+        const new_len = arg.requires.len + 1;
+        const new_slice = try self.allocator.alloc([]const u8, new_len);
+        try self.allocated_slices_u8.append(self.allocator, new_slice);
+        @memcpy(new_slice[0..arg.requires.len], arg.requires);
+        const duped_str = try self.allocator.dupe(u8, required_name);
+        try self.allocated_strings.append(self.allocator, duped_str);
+        new_slice[arg.requires.len] = duped_str;
+        arg.requires = new_slice;
+    }
+
+    /// Declares a conditional requirement: `arg_name` is required if `when_arg` is present (optionally with a specific `when_value`).
+    pub fn addRequiredIf(self: *ArgumentParser, arg_name: []const u8, when_arg: []const u8, when_value: ?[]const u8) !void {
+        const arg = self.findArgSpecMut(arg_name) orelse return error.InvalidArgument;
+
+        const new_len = arg.required_if.len + 1;
+        const new_slice = try self.allocator.alloc(schema.RequiredIf, new_len);
+        try self.allocated_slices_req.append(self.allocator, new_slice);
+        @memcpy(new_slice[0..arg.required_if.len], arg.required_if);
+        const duped_when = try self.allocator.dupe(u8, when_arg);
+        try self.allocated_strings.append(self.allocator, duped_when);
+        const duped_value = if (when_value) |v| try self.allocator.dupe(u8, v) else null;
+        if (duped_value) |v| try self.allocated_strings.append(self.allocator, v);
+        new_slice[arg.required_if.len] = .{
+            .when_arg = duped_when,
+            .when_value = duped_value,
+        };
+        arg.required_if = new_slice;
+    }
+
+    /// Declares a list of mutually exclusive option names (at most one may be provided).
+    pub fn addMutualExclusion(self: *ArgumentParser, names: []const []const u8) !void {
+        const duped = try self.allocator.alloc([]const u8, names.len);
+        for (names, 0..) |n, i| {
+            duped[i] = try self.allocator.dupe(u8, n);
+        }
+        try self.mutual_exclusions.append(self.allocator, duped);
+    }
+
+    /// Adds a duration option (e.g. --timeout 1h30m, stored/parsed as u64 seconds).
+    pub fn addDurationOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        suggestion_hint: ?[]const u8 = null,
+    }) !void {
+        try self.addArg(.{
+            .name = name,
+            .short = options.short,
+            .long = name,
+            .aliases = options.aliases,
+            .help = if (options.help) |h| h else constants.FeatureMessages.duration_help_suffix,
+            .value_type = .duration,
+            .default = options.default,
+            .required = options.required,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .deprecated = options.deprecated,
+            .validator = validation.Validators.duration,
+            .suggestion_hint = options.suggestion_hint,
+        });
+    }
+
+    /// Adds a byte size option (e.g. --size 1GB, stored/parsed as u64 bytes).
+    pub fn addSizeOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        suggestion_hint: ?[]const u8 = null,
+    }) !void {
+        try self.addArg(.{
+            .name = name,
+            .short = options.short,
+            .long = name,
+            .aliases = options.aliases,
+            .help = if (options.help) |h| h else constants.FeatureMessages.size_help_suffix,
+            .value_type = .byte_size,
+            .default = options.default,
+            .required = options.required,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .deprecated = options.deprecated,
+            .validator = validation.Validators.byteSize,
+            .suggestion_hint = options.suggestion_hint,
+        });
+    }
+
+    /// Adds a range-validated option supporting both integer and floating-point types.
+    pub fn addRangeOption(self: *ArgumentParser, name: []const u8, comptime T: type, comptime options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        min: ?T = null,
+        max: ?T = null,
+    }) !void {
+        if (T == i64 or T == i32 or T == isize or T == u64 or T == u32) {
+            const validator_fn = validation.Validators.intRange(
+                if (options.min) |m| @intCast(m) else null,
+                if (options.max) |m| @intCast(m) else null,
+            );
+            try self.addOption(name, .{
+                .short = options.short,
+                .help = options.help,
+                .value_type = .int,
+                .default = options.default,
+                .required = options.required,
+                .dest = options.dest,
+                .env_var = options.env_var,
+                .hidden = options.hidden,
+                .aliases = options.aliases,
+                .deprecated = options.deprecated,
+                .validator = validator_fn,
+            });
+        } else if (T == f64 or T == f32) {
+            const validator_fn = validation.Validators.floatRange(
+                if (options.min) |m| @floatCast(m) else null,
+                if (options.max) |m| @floatCast(m) else null,
+            );
+            try self.addOption(name, .{
+                .short = options.short,
+                .help = options.help,
+                .value_type = .float,
+                .default = options.default,
+                .required = options.required,
+                .dest = options.dest,
+                .env_var = options.env_var,
+                .hidden = options.hidden,
+                .aliases = options.aliases,
+                .deprecated = options.deprecated,
+                .validator = validator_fn,
+            });
+        } else {
+            @compileError("addRangeOption only supports integer or floating-point types");
+        }
+    }
+
+    /// Adds an option validated by character length range (minimum and maximum character count).
+    pub fn addCharRangeOption(self: *ArgumentParser, name: []const u8, comptime options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        min: ?usize = null,
+        max: ?usize = null,
+    }) !void {
+        const min_len = options.min orelse 0;
+        const max_len = options.max orelse std.math.maxInt(usize);
+
+        const validator_fn = validation.Validators.charRange(min_len, max_len);
+
+        try self.addOption(name, .{
+            .short = options.short,
+            .help = options.help,
+            .value_type = .string,
+            .default = options.default,
+            .required = options.required,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .validator = validator_fn,
+        });
+    }
+
+    /// Automatically resolves any configuration conflicts in the active parser's config.
+    pub fn configureAutoResolve(self: *ArgumentParser) void {
+        self.cfg = self.cfg.autoResolve();
+    }
+
+    /// Gets a list of configuration warnings for the active configuration.
+    /// The caller must provide a slice of `ConfigWarning` to be filled.
+    /// Returns the number of warnings written.
+    pub fn getConfigWarnings(self: *const ArgumentParser, buf: []config.ConfigWarning) usize {
+        return self.cfg.validate(buf);
     }
 
     /// Adds an option with an environment variable fallback and default value.
@@ -3324,6 +3594,35 @@ test "ArgumentParser typed validation option helpers" {
     }
 }
 
+test "ArgumentParser addCharRangeOption" {
+    const allocator = std.testing.allocator;
+
+    var ap = try ArgumentParser.init(allocator, .{
+        .name = "char-range-test",
+        .config = Config.minimal(),
+    });
+    defer ap.deinit();
+
+    try ap.addCharRangeOption("username", .{ .min = 3, .max = 10 });
+
+    {
+        const argv = [_][]const u8{ "--username", "alice" };
+        var result = try ap.parse(&argv);
+        defer result.deinit();
+        try std.testing.expectEqualStrings("alice", result.getString("username").?);
+    }
+
+    {
+        const argv = [_][]const u8{ "--username", "ai" };
+        try std.testing.expectError(error.CustomValidationFailed, ap.parse(&argv));
+    }
+
+    {
+        const argv = [_][]const u8{ "--username", "extremelylongusername" };
+        try std.testing.expectError(error.CustomValidationFailed, ap.parse(&argv));
+    }
+}
+
 test "ArgumentParser addDeprecated" {
     const allocator = std.testing.allocator;
 
@@ -3829,4 +4128,126 @@ test "configure alias" {
 
     const cfg = config.getConfig();
     try std.testing.expect(!cfg.use_colors);
+}
+
+test "ArgumentParser conflicts and requirements" {
+    const allocator = std.testing.allocator;
+    config.initConfig(Config.testing());
+    defer config.resetConfig();
+
+    var ap = try ArgumentParser.init(allocator, .{ .name = "test" });
+    defer ap.deinit();
+
+    try ap.addFlag("verbose", .{});
+    try ap.addFlag("quiet", .{});
+    try ap.addOption("output", .{});
+    try ap.addOption("log-file", .{});
+
+    try ap.addConflict("verbose", "quiet");
+    try ap.addRequires("log-file", "output");
+
+    // Test conflicts
+    const args1 = [_][]const u8{ "--verbose", "--quiet" };
+    try std.testing.expectError(error.CircularConflict, ap.parse(&args1));
+
+    // Test requires
+    const args2 = [_][]const u8{ "--log-file", "debug.log" };
+    try std.testing.expectError(error.MissingDependency, ap.parse(&args2));
+
+    const args3 = [_][]const u8{ "--log-file", "debug.log", "--output", "out.txt" };
+    var result = try ap.parse(&args3);
+    defer result.deinit();
+    try std.testing.expect(result.contains("log-file"));
+    try std.testing.expect(result.contains("output"));
+}
+
+test "ArgumentParser conditional requirements and mutual exclusion" {
+    const allocator = std.testing.allocator;
+    config.initConfig(Config.testing());
+    defer config.resetConfig();
+
+    var ap = try ArgumentParser.init(allocator, .{ .name = "test" });
+    defer ap.deinit();
+
+    try ap.addFlag("mysql", .{});
+    try ap.addOption("host", .{});
+    try ap.addOption("port", .{});
+    try ap.addOption("user", .{});
+
+    try ap.addRequiredIf("host", "mysql", null);
+    try ap.addRequiredIf("port", "host", null);
+
+    // mutually exclusive db connections
+    try ap.addMutualExclusion(&[_][]const u8{ "mysql", "user" });
+
+    // mysql provided but no host -> fails conditional requirement
+    const args1 = [_][]const u8{"--mysql"};
+    try std.testing.expectError(error.RequiredIfViolation, ap.parse(&args1));
+
+    // mysql and host provided -> port is required if host is provided -> fails
+    const args2 = [_][]const u8{ "--mysql", "--host", "127.0.0.1" };
+    try std.testing.expectError(error.RequiredIfViolation, ap.parse(&args2));
+
+    // mutual exclusion error
+    const args3 = [_][]const u8{ "--mysql", "--user", "admin", "--host", "127.0.0.1", "--port", "3306" };
+    try std.testing.expectError(error.MutuallyExclusive, ap.parse(&args3));
+
+    const args4 = [_][]const u8{ "--mysql", "--host", "127.0.0.1", "--port", "3306" };
+    var result = try ap.parse(&args4);
+    defer result.deinit();
+}
+
+test "ArgumentParser duration size and range options" {
+    const allocator = std.testing.allocator;
+    config.initConfig(Config.testing());
+    defer config.resetConfig();
+
+    var ap = try ArgumentParser.init(allocator, .{ .name = "test" });
+    defer ap.deinit();
+
+    try ap.addDurationOption("timeout", .{});
+    try ap.addSizeOption("buffer", .{});
+    try ap.addRangeOption("retries", i64, comptime .{ .min = 1, .max = 5 });
+
+    const args1 = [_][]const u8{ "--timeout", "1h30m", "--buffer", "512MB", "--retries", "3" };
+    var result = try ap.parse(&args1);
+    defer result.deinit();
+
+    try std.testing.expectEqual(@as(u64, 5400), result.getDuration("timeout").?);
+    try std.testing.expectEqual(@as(u64, 512 * 1024 * 1024), result.getSize("buffer").?);
+    try std.testing.expectEqual(@as(i64, 3), result.get("retries").?.asInt().?);
+
+    // invalid duration
+    const args2 = [_][]const u8{ "--timeout", "invalid" };
+    try std.testing.expectError(error.InvalidValue, ap.parse(&args2));
+
+    // invalid range
+    const args3 = [_][]const u8{ "--retries", "10" };
+    try std.testing.expectError(error.CustomValidationFailed, ap.parse(&args3));
+}
+
+test "ArgumentParser config auto-resolve and warnings" {
+    const allocator = std.testing.allocator;
+
+    // Config that has conflicts: permissive + exit_on_error
+    const cfg = Config{
+        .parsing_mode = .permissive,
+        .exit_on_error = true,
+        .use_colors = true,
+        .silent_errors = true, // auto-resolve will turn off colors and updates
+    };
+
+    var ap = try ArgumentParser.init(allocator, .{
+        .name = "test",
+        .config = cfg,
+    });
+    defer ap.deinit();
+
+    var warnings: [16]config.ConfigWarning = undefined;
+    const count = ap.getConfigWarnings(&warnings);
+    try std.testing.expect(count > 0);
+
+    ap.configureAutoResolve();
+    try std.testing.expect(!ap.cfg.exit_on_error);
+    try std.testing.expect(!ap.cfg.use_colors);
 }

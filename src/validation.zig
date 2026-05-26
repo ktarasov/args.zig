@@ -3,6 +3,7 @@
 const std = @import("std");
 const types = @import("types.zig");
 const utils = @import("utils.zig");
+const constants = @import("constants.zig");
 
 pub const ValueType = types.ValueType;
 pub const ParsedValue = types.ParsedValue;
@@ -62,6 +63,8 @@ pub fn parseValue(value: []const u8, value_type: ValueType, allocator: std.mem.A
         .bool => .{ .boolean = utils.parseBool(value) orelse return error.InvalidValue },
         .counter => .{ .counter = std.fmt.parseInt(u32, value, 10) catch return error.InvalidValue },
         .array, .custom => .{ .string = value },
+        .duration => .{ .uint = parseDuration(value) catch return error.InvalidValue },
+        .byte_size => .{ .uint = parseByteSize(value) catch return error.InvalidValue },
         .key_value => blk: {
             if (std.mem.indexOfScalar(u8, value, '=')) |idx| {
                 const k = value[0..idx];
@@ -742,6 +745,19 @@ pub const Validators = struct {
         }.validate;
     }
 
+    /// Creates a validator for character length range.
+    pub fn charRange(comptime min_len: usize, comptime max_len: usize) ValidatorFn {
+        return struct {
+            fn validate(io: std.Io, value: []const u8) ValidationResult {
+                _ = io;
+                if (value.len < min_len or value.len > max_len) {
+                    return .{ .err = "character length is out of range" };
+                }
+                return .{ .ok = {} };
+            }
+        }.validate;
+    }
+
     /// One-call filename policy validator for common CLI output/input file-name checks.
     /// - Always enforces safe file-name rules (no path separators/invalid chars)
     /// - Optionally enforces extension membership
@@ -827,15 +843,6 @@ pub const Validators = struct {
         }.validate;
     }
 
-    // Aliases for concise client-side usage.
-    pub fn all(comptime validator_list: []const ValidatorFn) ValidatorFn {
-        return allOf(validator_list);
-    }
-
-    pub fn any(comptime validator_list: []const ValidatorFn) ValidatorFn {
-        return anyOf(validator_list);
-    }
-
     pub const fileName = fileNameSafe;
     pub const email = emailAddress;
     pub const url = httpUrl;
@@ -851,7 +858,210 @@ pub const Validators = struct {
     pub const ext = extension;
     pub const fileExt = fileNameWithExtensions;
     pub const filePolicy = fileNamePolicy;
+
+    // Aliases for concise client-side usage.
+    pub fn all(comptime validator_list: []const ValidatorFn) ValidatorFn {
+        return allOf(validator_list);
+    }
+
+    pub fn any(comptime validator_list: []const ValidatorFn) ValidatorFn {
+        return anyOf(validator_list);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // New validators added in v0.0.6
+    // ──────────────────────────────────────────────────────────────────
+
+    /// Alias for `nonEmpty` — value must not be an empty string.
+    pub const notEmpty = nonEmpty;
+
+    /// Value must contain ONLY letters and digits ([a-zA-Z0-9]).
+    /// Messages come from constants.ErrorMessages.
+    pub fn alphanumericStrict(io: std.Io, value: []const u8) ValidationResult {
+        _ = io;
+        if (value.len == 0) return .{ .err = constants.ErrorMessages.validation_not_alphanumeric };
+        for (value) |c| {
+            if (!std.ascii.isAlphanumeric(c))
+                return .{ .err = constants.ErrorMessages.validation_not_alphanumeric };
+        }
+        return .{ .ok = {} };
+    }
+
+    /// Value must be a URL-safe slug: lowercase letters, digits, hyphens only.
+    pub fn slug(io: std.Io, value: []const u8) ValidationResult {
+        _ = io;
+        if (value.len == 0) return .{ .err = constants.ErrorMessages.validation_not_slug };
+        for (value) |c| {
+            const ok = std.ascii.isLower(c) or std.ascii.isDigit(c) or c == '-';
+            if (!ok) return .{ .err = constants.ErrorMessages.validation_not_slug };
+        }
+        return .{ .ok = {} };
+    }
+
+    /// Value must not contain any whitespace (space, tab, newline, etc.).
+    pub fn noWhitespace(io: std.Io, value: []const u8) ValidationResult {
+        _ = io;
+        for (value) |c| {
+            if (std.ascii.isWhitespace(c))
+                return .{ .err = constants.ErrorMessages.validation_has_whitespace };
+        }
+        return .{ .ok = {} };
+    }
+
+    /// Value must parse as a number > 0.
+    pub fn positive(io: std.Io, value: []const u8) ValidationResult {
+        _ = io;
+        const f = std.fmt.parseFloat(f64, value) catch
+            return .{ .err = constants.ErrorMessages.validation_not_positive };
+        if (f <= 0.0) return .{ .err = constants.ErrorMessages.validation_not_positive };
+        return .{ .ok = {} };
+    }
+
+    /// Value must parse as a number >= 0.
+    pub fn nonNegative(io: std.Io, value: []const u8) ValidationResult {
+        _ = io;
+        const f = std.fmt.parseFloat(f64, value) catch
+            return .{ .err = constants.ErrorMessages.validation_not_non_negative };
+        if (f < 0.0) return .{ .err = constants.ErrorMessages.validation_not_non_negative };
+        return .{ .ok = {} };
+    }
+
+    /// Value must have at least `n` characters.
+    pub fn minLength(comptime n: usize) ValidatorFn {
+        return struct {
+            fn validate(io: std.Io, value: []const u8) ValidationResult {
+                _ = io;
+                if (value.len < n) return .{ .err = constants.ErrorMessages.validation_min_length };
+                return .{ .ok = {} };
+            }
+        }.validate;
+    }
+
+    /// Value must have at most `n` characters.
+    pub fn maxLength(comptime n: usize) ValidatorFn {
+        return struct {
+            fn validate(io: std.Io, value: []const u8) ValidationResult {
+                _ = io;
+                if (value.len > n) return .{ .err = constants.ErrorMessages.validation_max_length };
+                return .{ .ok = {} };
+            }
+        }.validate;
+    }
+
+    /// Validates duration strings like `1h30m`, `45s`, `2d`, `3h`, `10m30s`.
+    pub fn duration(io: std.Io, value: []const u8) ValidationResult {
+        _ = io;
+        _ = parseDuration(value) catch
+            return .{ .err = constants.ErrorMessages.validation_invalid_duration };
+        return .{ .ok = {} };
+    }
+
+    /// Validates byte-size strings like `1GB`, `512MB`, `4096`, `2TB`.
+    pub fn byteSize(io: std.Io, value: []const u8) ValidationResult {
+        _ = io;
+        _ = parseByteSize(value) catch
+            return .{ .err = constants.ErrorMessages.validation_invalid_size };
+        return .{ .ok = {} };
+    }
 };
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Duration and byte-size parsing (standalone helpers used by Validators above)
+// ──────────────────────────────────────────────────────────────────────────────
+
+/// Parse a duration string into total seconds.
+/// Supported units: d (days), h (hours), m (minutes), s (seconds).
+/// Examples: "1h30m" → 5400, "45s" → 45, "2d" → 172800.
+/// Returns error.InvalidValue on malformed input.
+pub fn parseDuration(s: []const u8) !u64 {
+    if (s.len == 0) return error.InvalidValue;
+
+    var total: u64 = 0;
+    var i: usize = 0;
+    var found_any: bool = false;
+
+    while (i < s.len) {
+        // Collect digits
+        const num_start = i;
+        while (i < s.len and std.ascii.isDigit(s[i])) : (i += 1) {}
+        if (i == num_start) return error.InvalidValue; // no digit before unit
+
+        const num = std.fmt.parseInt(u64, s[num_start..i], 10) catch return error.InvalidValue;
+
+        if (i >= s.len) return error.InvalidValue; // digit with no unit
+        const unit = s[i];
+        i += 1;
+
+        const factor: u64 = switch (unit) {
+            'd', 'D' => 86400,
+            'h', 'H' => 3600,
+            'm', 'M' => 60,
+            's', 'S' => 1,
+            else => return error.InvalidValue,
+        };
+
+        total += num * factor;
+        found_any = true;
+    }
+
+    if (!found_any) return error.InvalidValue;
+    return total;
+}
+
+/// Parse a byte-size string into total bytes.
+/// Supports: B, KB, MB, GB, TB, PB (case-insensitive), or a plain integer (bytes).
+/// Examples: "1GB" → 1073741824, "512MB" → 536870912, "4096" → 4096.
+/// Returns error.InvalidValue on malformed input.
+pub fn parseByteSize(s: []const u8) !u64 {
+    if (s.len == 0) return error.InvalidValue;
+
+    // Find where digits end
+    var i: usize = 0;
+    while (i < s.len and std.ascii.isDigit(s[i])) : (i += 1) {}
+
+    if (i == 0) return error.InvalidValue;
+    const num = std.fmt.parseInt(u64, s[0..i], 10) catch return error.InvalidValue;
+
+    // Rest is the unit suffix (optional)
+    const suffix = std.mem.trim(u8, s[i..], " \t");
+
+    if (suffix.len == 0) return num; // plain bytes
+
+    const kb: u64 = 1024;
+    const mb: u64 = 1024 * kb;
+    const gb: u64 = 1024 * mb;
+    const tb: u64 = 1024 * gb;
+    const pb: u64 = 1024 * tb;
+
+    const factor: u64 = if (std.ascii.eqlIgnoreCase(suffix, "b"))
+        1
+    else if (std.ascii.eqlIgnoreCase(suffix, "kb"))
+        kb
+    else if (std.ascii.eqlIgnoreCase(suffix, "mb"))
+        mb
+    else if (std.ascii.eqlIgnoreCase(suffix, "gb"))
+        gb
+    else if (std.ascii.eqlIgnoreCase(suffix, "tb"))
+        tb
+    else if (std.ascii.eqlIgnoreCase(suffix, "pb"))
+        pb
+    else
+        return error.InvalidValue;
+
+    return num * factor;
+}
+
+/// Check whether `s` is a valid duration string.
+pub fn validateDurationStr(s: []const u8) bool {
+    parseDuration(s) catch return false;
+    return true;
+}
+
+/// Check whether `s` is a valid byte-size string.
+pub fn validateByteSizeStr(s: []const u8) bool {
+    parseByteSize(s) catch return false;
+    return true;
+}
 
 test "parseValue string" {
     const allocator = std.testing.allocator;
