@@ -9,30 +9,6 @@ head:
 
 # Update Checker Configuration
 
-## Latest Release Notes
-
-### v0.0.5
-
-- Minimum Zig version updated to **0.16.0**.
-- Updated all APIs to use Zig 0.16's `std.process.Init` pattern: `parseProcess(init)`, `main(init: std.process.Init)`.
-- `resolveSelectOrAllWithPrompt` and `resolveSelectOrAllWithPromptIO` no longer take an allocator parameter.
-- `resolveSelectOrAllWithPrompt` now accepts `io: std.Io` instead of creating an IO context inline.
-- `resolveSelectOrAllWithPromptIO` takes `*std.Io.Reader` and `*std.Io.Writer` instead of `anytype`.
-- All examples updated to use `std.heap.c_allocator` and Zig 0.16 idioms.
-- Full shell completion support including Nushell.
-
-### v0.0.4
-
-- Fixed a Windows parsing lifetime bug where values returned from `parseProcess()` could reference freed argument buffers.
-- Parsed string values are now owned by the parse result and remain valid until `result.deinit()`.
-- Added negated long flags (`--no-flag`) and explicit inverse flag API (`addFalseFlag`).
-- Added configurable parser behavior flags and richer positional validation options.
-- Added CMD-style convenience helpers: `addSelectOption`, `addAllFlag`, and `addSelectOrAll`.
-- Added include/exclude helpers (`addIncludeExclude`) with parsed list resolver utilities.
-- Added strict include/exclude resolver (`resolveIncludeExcludeStrict`) with canonicalization, dedupe, and conflict detection.
-- Added reusable file/path helpers with extension validation (`addPathOption`, `addFileOption`, `addDirectoryOption`, `addFileOptionWithExtensions`).
-- Expanded benchmark coverage with validation-focused measurements (file extension checks and filename policy checks).
-
 args.zig includes an optional non-blocking update checker that notifies users when a new version is available. By default, this feature is **enabled**. This guide explains how to configure or disable it.
 
 ## Why Disable?

@@ -3,12 +3,15 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const types = @import("types.zig");
+const utils = @import("utils.zig");
+const constants = @import("constants.zig");
 
 /// Global configuration for the argument parser.
 pub const Config = struct {
     check_for_updates: bool = true,
     show_update_notification: bool = true,
     use_colors: bool = true,
+    colors: ?utils.ColorTheme = null,
     help_line_width: usize = 80,
     help_indent: usize = 24,
     show_defaults: bool = true,
@@ -27,8 +30,8 @@ pub const Config = struct {
     suggestion_max_distance: usize = 3,
     suggest_builtin_commands: bool = true,
     suggest_subcommands: bool = true,
-    error_prefix: []const u8 = "Error",
-    warning_prefix: []const u8 = "Warning",
+    error_prefix: []const u8 = constants.Defaults.error_prefix,
+    warning_prefix: []const u8 = constants.Defaults.warning_prefix,
     unknown_option_hint: ?[]const u8 = null,
     unknown_subcommand_hint: ?[]const u8 = null,
     unknown_option_message: ?[]const u8 = null,
@@ -62,6 +65,13 @@ pub const Config = struct {
             .show_defaults = true,
             .show_env_vars = true,
             .use_colors = true,
+        };
+    }
+
+    pub fn colorful() Config {
+        return .{
+            .use_colors = true,
+            .colors = utils.ColorTheme.bright(),
         };
     }
 };
@@ -116,6 +126,12 @@ test "Config.minimal" {
     try std.testing.expect(!cfg.check_for_updates);
     try std.testing.expect(!cfg.use_colors);
     try std.testing.expect(!cfg.exit_on_error);
+}
+
+test "Config.colorful" {
+    const cfg = Config.colorful();
+    try std.testing.expect(cfg.use_colors);
+    try std.testing.expect(cfg.colors != null);
 }
 
 test "initConfig and getConfig" {

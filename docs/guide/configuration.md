@@ -23,6 +23,7 @@ const Config = struct {
     
     // Display options
     use_colors: bool = true,
+    colors: ?args.ColorTheme = null,
     help_line_width: usize = 80,
     help_indent: usize = 24,
     show_defaults: bool = true,
@@ -75,6 +76,7 @@ const Config = struct {
 | Option | Default | Description |
 |--------|---------|-------------|
 | `use_colors` | `true` | Use ANSI colors in help output |
+| `colors` | `null` | Optional theme override for colored output |
 | `help_line_width` | `80` | Maximum line width for help text |
 | `help_indent` | `24` | Indentation for option descriptions |
 | `show_defaults` | `true` | Show default values in help |
@@ -121,6 +123,21 @@ const Config = struct {
 - `help_indent` controls the alignment column used for option descriptions.
 - `help_line_width` is used to wrap long option descriptions and metadata blocks.
 - `app_author` is printed in help output when set.
+
+## Color Themes
+
+args.zig ships with a standard palette and a brighter preset. You can override colors globally:
+
+```zig
+const args = @import("args");
+
+args.initConfig(.{
+    .use_colors = true,
+    .colors = args.ColorTheme.bright(),
+});
+```
+
+To fully disable color codes, set `use_colors = false` (all theme fields are ignored).
 
 ## Configuration Presets
 

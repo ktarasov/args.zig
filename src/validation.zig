@@ -406,72 +406,18 @@ pub fn validateHexColor(value: []const u8) bool {
 /// Validates semantic version strings (`MAJOR.MINOR.PATCH` with optional pre-release/build).
 pub fn validateSemver(value: []const u8) bool {
     if (value.len == 0) return false;
-
-    // Split into version and optional pre-release/build parts
-    const pre_idx = std.mem.indexOfScalar(u8, value, '-');
-    const build_idx = std.mem.indexOfScalar(u8, value, '+');
-
-    var main_part = value;
-    if (build_idx) |bi| {
-        main_part = value[0..bi];
-        // validate build metadata (alphanumeric + hyphens/dots)
-        const build_meta = value[bi + 1 ..];
-        if (build_meta.len == 0) return false;
-        for (build_meta) |c| {
-            if (!std.ascii.isAlphanumeric(c) and c != '-' and c != '.') return false;
-        }
-    }
-    if (pre_idx) |pi| {
-        if (build_idx) |bi| {
-            if (pi < bi) {
-                main_part = value[0..pi];
-                const pre_part = value[pi + 1 .. bi];
-                if (pre_part.len == 0) return false;
-                for (pre_part) |c| {
-                    if (!std.ascii.isAlphanumeric(c) and c != '-' and c != '.') return false;
-                }
-            }
-        } else {
-            main_part = value[0..pi];
-            const pre_part = value[pi + 1 ..];
-            if (pre_part.len == 0) return false;
-            for (pre_part) |c| {
-                if (!std.ascii.isAlphanumeric(c) and c != '-' and c != '.') return false;
-            }
-        }
-    }
-
-    const dot1 = std.mem.indexOfScalar(u8, main_part, '.') orelse return false;
-    const dot2 = std.mem.lastIndexOfScalar(u8, main_part, '.') orelse return false;
-    if (dot1 == dot2) return false;
-
-    const major = main_part[0..dot1];
-    const minor = main_part[dot1 + 1 .. dot2];
-    const patch = main_part[dot2 + 1 ..];
-
-    if (major.len == 0 or minor.len == 0 or patch.len == 0) return false;
-    for (major) |c| {
-        if (!std.ascii.isDigit(c)) return false;
-    }
-    for (minor) |c| {
-        if (!std.ascii.isDigit(c)) return false;
-    }
-    for (patch) |c| {
-        if (!std.ascii.isDigit(c)) return false;
-    }
-
+    _ = std.SemanticVersion.parse(value) catch return false;
     return true;
 }
 
 /// Validates base64 encoded strings.
 pub fn validateBase64(value: []const u8) bool {
     if (value.len == 0) return false;
-    // Check for valid base64 characters
-    for (value) |c| {
-        if (std.ascii.isAlphanumeric(c)) continue;
-        if (c == '+' or c == '/' or c == '=') continue;
-        return false;
-    }
+    const decoder = std.base64.standard.Decoder;
+    const decoded_len = decoder.calcSizeForSlice(value) catch return false;
+    const decoded = std.heap.page_allocator.alloc(u8, decoded_len) catch return false;
+    defer std.heap.page_allocator.free(decoded);
+    decoder.decode(decoded, value) catch return false;
     return true;
 }
 

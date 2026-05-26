@@ -101,10 +101,10 @@ pub fn main(init: std.process.Init) !void {
 
 ### Release Installation (Recommended)
 
-Install the latest stable release (v0.0.5):
+Install the latest stable release (v0.0.6):
 
 ```bash
-zig fetch --save https://github.com/muhammad-fiaz/args.zig/archive/refs/tags/0.0.5.tar.gz
+zig fetch --save https://github.com/muhammad-fiaz/args.zig/archive/refs/tags/0.0.6.tar.gz
 ```
 
 Install the supported release for Zig v0.15 (v0.0.4):
@@ -135,5 +135,5 @@ exe.root_module.addImport("args", args_dep.module("args"));
 
 ## Current Version
 
-- **Package Version:** 0.0.5
+- **Package Version:** 0.0.6
 - **Minimum Zig Version:** 0.16.0

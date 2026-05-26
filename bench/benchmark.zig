@@ -27,13 +27,20 @@ const ITERATIONS = 10_000;
 const WARMUP = 100;
 
 var bench_io: std.Io = undefined;
+const use_colors = !builtin.is_test;
 
 fn printResults(results: []const BenchmarkResult) void {
+    const theme = args.utils.resolveTheme(use_colors, args.Config.colorful().colors);
+    const reset = theme.reset;
+    const header = theme.header;
+    const section = theme.section;
+    const accent = theme.accent;
+
     std.debug.print("\n", .{});
-    std.debug.print("-" ** 100, .{});
+    std.debug.print("{s}{s}{s}", .{ header, "-" ** 100, reset });
     std.debug.print("\n", .{});
-    std.debug.print("                                 ARGS.ZIG BENCHMARK RESULTS\n", .{});
-    std.debug.print("-" ** 100, .{});
+    std.debug.print("{s}                                 ARGS.ZIG BENCHMARK RESULTS{s}\n", .{ accent, reset });
+    std.debug.print("{s}{s}{s}", .{ header, "-" ** 100, reset });
     std.debug.print("\n", .{});
 
     for (BenchmarkResult.categories) |cat| {
@@ -46,11 +53,11 @@ fn printResults(results: []const BenchmarkResult) void {
         }
         if (!has_category) continue;
 
-        std.debug.print("\n[{s}]\n", .{cat});
-        std.debug.print("-" ** 100, .{});
+        std.debug.print("\n{s}[{s}]{s}\n", .{ section, cat, reset });
+        std.debug.print("{s}{s}{s}", .{ header, "-" ** 100, reset });
         std.debug.print("\n", .{});
-        std.debug.print("{s:<40} {s:>25} {s:>25}\n", .{ "Benchmark", "Ops/sec", "Avg Latency (ns)" });
-        std.debug.print("-" ** 100, .{});
+        std.debug.print("{s}{s:<40} {s:>25} {s:>25}{s}\n", .{ accent, "Benchmark", "Ops/sec", "Avg Latency (ns)", reset });
+        std.debug.print("{s}{s}{s}", .{ header, "-" ** 100, reset });
         std.debug.print("\n", .{});
 
         for (results) |r| {
@@ -65,7 +72,7 @@ fn printResults(results: []const BenchmarkResult) void {
     }
 
     std.debug.print("\n", .{});
-    std.debug.print("-" ** 130, .{});
+    std.debug.print("{s}{s}{s}", .{ header, "-" ** 130, reset });
     std.debug.print("\n", .{});
 }
 

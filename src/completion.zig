@@ -4,6 +4,7 @@ const std = @import("std");
 const schema = @import("schema.zig");
 const utils = @import("utils.zig");
 const config_mod = @import("config.zig");
+const constants = @import("constants.zig");
 
 pub const CommandSpec = schema.CommandSpec;
 pub const ArgSpec = schema.ArgSpec;
@@ -91,8 +92,8 @@ fn generateZshCompletion(allocator: std.mem.Allocator, spec: CommandSpec) ![]con
         }
     }
 
-    try writer.writeAll("        '--help[Print help]'\n");
-    if (spec.version != null) try writer.writeAll("        '--version[Print version]'\n");
+    try writer.print("        '--help[{s}]'\n", .{constants.HelpText.print_help});
+    if (spec.version != null) try writer.print("        '--version[{s}]'\n", .{constants.HelpText.print_version});
     try writer.print("    )\n    _arguments -s $opts\n}}\n_{s} \"$@\"\n", .{spec.name});
 
     return aw.toOwnedSlice();
@@ -114,8 +115,8 @@ fn generateFishCompletion(allocator: std.mem.Allocator, spec: CommandSpec) ![]co
         try writer.writeAll("\n");
     }
 
-    try writer.print("complete -c {s} -s h -l help -d 'Print help'\n", .{spec.name});
-    if (spec.version != null) try writer.print("complete -c {s} -s V -l version -d 'Print version'\n", .{spec.name});
+    try writer.print("complete -c {s} -s h -l help -d '{s}'\n", .{ spec.name, constants.HelpText.print_help });
+    if (spec.version != null) try writer.print("complete -c {s} -s V -l version -d '{s}'\n", .{ spec.name, constants.HelpText.print_version });
 
     for (spec.subcommands) |sub| {
         if (sub.hidden) continue;
@@ -142,9 +143,9 @@ fn generatePowershellCompletion(allocator: std.mem.Allocator, spec: CommandSpec)
         }
     }
 
-    try writer.writeAll("        [CompletionResult]::new('--help', '--help', 'ParameterName', 'Print help')\n");
+    try writer.print("        [CompletionResult]::new('--help', '--help', 'ParameterName', '{s}')\n", .{constants.HelpText.print_help});
     if (spec.version != null) {
-        try writer.writeAll("        [CompletionResult]::new('--version', '--version', 'ParameterName', 'Print version')\n");
+        try writer.print("        [CompletionResult]::new('--version', '--version', 'ParameterName', '{s}')\n", .{constants.HelpText.print_version});
     }
 
     try writer.writeAll("    )\n    $completions | Where-Object { $_.CompletionText -like \"$wordToComplete*\" }\n}\n");
@@ -185,8 +186,8 @@ fn generateNushellCompletion(allocator: std.mem.Allocator, spec: CommandSpec) ![
         try writer.writeAll("\n");
     }
 
-    try writer.writeAll("    --help(-h) # Print help\n");
-    if (spec.version != null) try writer.writeAll("    --version(-V) # Print version\n");
+    try writer.print("    --help(-h) # {s}\n", .{constants.HelpText.print_help});
+    if (spec.version != null) try writer.print("    --version(-V) # {s}\n", .{constants.HelpText.print_version});
 
     try writer.writeAll("]\n");
 

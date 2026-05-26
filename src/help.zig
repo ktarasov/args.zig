@@ -4,7 +4,7 @@ const std = @import("std");
 const schema = @import("schema.zig");
 const config = @import("config.zig");
 const utils = @import("utils.zig");
-const Color = utils.Color;
+const constants = @import("constants.zig");
 
 pub const CommandSpec = schema.CommandSpec;
 pub const ArgSpec = schema.ArgSpec;
@@ -21,19 +21,20 @@ pub fn generateHelpWithConfig(allocator: std.mem.Allocator, spec: CommandSpec, u
     errdefer aw.deinit();
     const writer = &aw.writer;
 
-    const reset = Color.get(Color.reset, use_colors);
-    const bold = Color.get(Color.bold, use_colors);
-    const dim = Color.get(Color.dim, use_colors);
-    const yellow = Color.get(Color.yellow, use_colors);
-    const green = Color.get(Color.green, use_colors);
-    const cyan = Color.get(Color.cyan, use_colors);
+    const theme = utils.resolveTheme(use_colors, cfg.colors);
+    const reset = theme.reset;
+    const bold = theme.bold;
+    const dim = theme.dim;
+    const header = theme.header;
+    const option = theme.option;
+    const argument = theme.argument;
     const display_name = cfg.program_name orelse spec.name;
 
     if (spec.description) |desc| {
         try writer.print("{s}{s}{s}\n\n", .{ bold, desc, reset });
     }
 
-    try writer.print("{s}USAGE:{s}\n", .{ yellow, reset });
+    try writer.print("{s}{s}{s}\n", .{ header, constants.HelpText.usage, reset });
     try writer.print("    {s}{s}{s}", .{ bold, display_name, reset });
 
     if (spec.args.len > 0) try writer.writeAll(" [OPTIONS]");
@@ -53,10 +54,10 @@ pub fn generateHelpWithConfig(allocator: std.mem.Allocator, spec: CommandSpec, u
     try writer.writeAll("\n\n");
 
     if (spec.subcommands.len > 0) {
-        try writer.print("{s}COMMANDS:{s}\n", .{ yellow, reset });
+        try writer.print("{s}{s}{s}\n", .{ header, constants.HelpText.commands, reset });
         for (spec.subcommands) |sub| {
             if (sub.hidden) continue;
-            try writer.print("    {s}{s}{s}", .{ green, sub.name, reset });
+            try writer.print("    {s}{s}{s}", .{ option, sub.name, reset });
             const padding = if (sub.name.len < 20) 20 - sub.name.len else 2;
             for (0..padding) |_| try writer.writeByte(' ');
             if (sub.help) |h| try writer.print("{s}", .{h});
@@ -74,10 +75,10 @@ pub fn generateHelpWithConfig(allocator: std.mem.Allocator, spec: CommandSpec, u
     }
 
     if (has_positionals) {
-        try writer.print("{s}ARGUMENTS:{s}\n", .{ yellow, reset });
+        try writer.print("{s}{s}{s}\n", .{ header, constants.HelpText.arguments, reset });
         for (spec.args) |arg| {
             if (!arg.positional or arg.hidden) continue;
-            try writer.print("    {s}<{s}>{s}", .{ cyan, arg.name, reset });
+            try writer.print("    {s}<{s}>{s}", .{ argument, arg.name, reset });
             const padding = if (arg.name.len + 2 < 20) 20 - arg.name.len - 2 else 2;
             for (0..padding) |_| try writer.writeByte(' ');
             if (arg.help) |h| try writer.print("{s}", .{h});
@@ -109,7 +110,7 @@ pub fn generateHelpWithConfig(allocator: std.mem.Allocator, spec: CommandSpec, u
         }
 
         if (has_group_options) {
-            try writer.print("{s}{s}:{s}\n", .{ yellow, group.name, reset });
+            try writer.print("{s}{s}:{s}\n", .{ header, group.name, reset });
             if (group.description) |desc| {
                 try writer.print("  {s}{s}\n\n", .{ dim, desc });
             }
@@ -118,7 +119,7 @@ pub fn generateHelpWithConfig(allocator: std.mem.Allocator, spec: CommandSpec, u
                 if (arg.positional or arg.hidden) continue;
                 if (arg.group) |gname| {
                     if (utils.eql(gname, group.name)) {
-                        try printOption(writer, arg, cfg, use_colors);
+                        try printOption(writer, arg, cfg, theme);
                     }
                 }
             }
@@ -136,30 +137,30 @@ pub fn generateHelpWithConfig(allocator: std.mem.Allocator, spec: CommandSpec, u
     }
 
     if (has_ungrouped or spec.add_help or spec.add_version) {
-        try writer.print("{s}OPTIONS:{s}\n", .{ yellow, reset });
+        try writer.print("{s}{s}{s}\n", .{ header, constants.HelpText.options, reset });
 
         for (spec.args) |arg| {
             if (arg.positional or arg.hidden) continue;
             if (arg.group == null) {
-                try printOption(writer, arg, cfg, use_colors);
+                try printOption(writer, arg, cfg, theme);
             }
         }
 
         if (spec.add_help) {
-            try writer.print("    {s}-h{s}, {s}--help{s}", .{ green, reset, green, reset });
+            try writer.print("    {s}-h{s}, {s}--help{s}", .{ option, reset, option, reset });
             for (0..12) |_| try writer.writeByte(' ');
-            try writer.print("Print help\n", .{});
+            try writer.print("{s}\n", .{constants.HelpText.print_help});
         }
 
         if (spec.add_version and spec.version != null) {
-            try writer.print("    {s}-V{s}, {s}--version{s}", .{ green, reset, green, reset });
+            try writer.print("    {s}-V{s}, {s}--version{s}", .{ option, reset, option, reset });
             for (0..9) |_| try writer.writeByte(' ');
-            try writer.print("Print version\n", .{});
+            try writer.print("{s}\n", .{constants.HelpText.print_version});
         }
     }
 
     if (cfg.app_author) |author| {
-        try writer.print("\n{s}Author:{s} {s}\n", .{ yellow, reset, author });
+        try writer.print("\n{s}{s}:{s} {s}\n", .{ header, constants.HelpText.author, reset, author });
     }
 
     if (spec.epilog) |epilog| try writer.print("\n{s}\n", .{epilog});
@@ -167,22 +168,22 @@ pub fn generateHelpWithConfig(allocator: std.mem.Allocator, spec: CommandSpec, u
     return aw.toOwnedSlice();
 }
 
-fn printOption(writer: anytype, arg: ArgSpec, cfg: config.Config, use_colors: bool) !void {
-    const reset = Color.get(Color.reset, use_colors);
-    const green = Color.get(Color.green, use_colors);
-    const dim = Color.get(Color.dim, use_colors);
-    const yellow = Color.get(Color.yellow, use_colors);
+fn printOption(writer: anytype, arg: ArgSpec, cfg: config.Config, theme: utils.ColorTheme) !void {
+    const reset = theme.reset;
+    const option = theme.option;
+    const dim = theme.meta;
+    const header = theme.section;
 
     try writer.writeAll("    ");
     if (arg.short) |s| {
-        try writer.print("{s}-{c}{s}", .{ green, s, reset });
+        try writer.print("{s}-{c}{s}", .{ option, s, reset });
         if (arg.long != null) try writer.writeAll(", ") else try writer.writeAll("  ");
     } else {
         try writer.writeAll("    ");
     }
     var opt_len: usize = 4;
     if (arg.long) |l| {
-        try writer.print("{s}--{s}{s}", .{ green, l, reset });
+        try writer.print("{s}--{s}{s}", .{ option, l, reset });
         opt_len += l.len + 2;
     }
     if (!arg.isFlag()) {
@@ -259,7 +260,7 @@ fn printOption(writer: anytype, arg: ArgSpec, cfg: config.Config, use_colors: bo
             try writer.writeAll("\n");
             for (0..cfg.help_indent) |_| try writer.writeByte(' ');
         }
-        try writer.print(" {s}[DEPRECATED: {s}]{s}", .{ yellow, dep, reset });
+        try writer.print(" {s}[DEPRECATED: {s}]{s}", .{ header, dep, reset });
     }
     try writer.writeAll("\n");
 }
@@ -290,7 +291,7 @@ pub fn generateUsage(allocator: std.mem.Allocator, spec: CommandSpec) ![]const u
 }
 
 pub fn generateVersion(spec: CommandSpec) []const u8 {
-    return spec.version orelse "unknown";
+    return spec.version orelse constants.Defaults.unknown_version;
 }
 
 test "generateHelp basic" {

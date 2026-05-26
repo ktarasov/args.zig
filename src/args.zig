@@ -17,6 +17,7 @@ pub const version_info = @import("version.zig");
 pub const update_checker = @import("update_checker.zig");
 pub const network = @import("network.zig");
 pub const utils = @import("utils.zig");
+pub const constants = @import("constants.zig");
 
 // Re-export commonly used types
 pub const ParseResult = types.ParseResult;
@@ -38,13 +39,10 @@ pub const ValidationError = errors.ValidationError;
 pub const SchemaError = errors.SchemaError;
 pub const ValidatorFn = validation.ValidatorFn;
 pub const Validators = validation.Validators;
+pub const ColorTheme = utils.ColorTheme;
 
 // Version information
 pub const VERSION = version_info.version;
-pub const VERSION_MAJOR = version_info.version_major;
-pub const VERSION_MINOR = version_info.version_minor;
-pub const VERSION_PATCH = version_info.version_patch;
-pub const MINIMUM_ZIG_VERSION = version_info.minimum_zig_version;
 
 fn pickExtensionValidator(
     comptime allowed_extensions: []const []const u8,
@@ -112,7 +110,7 @@ pub const ArgumentParser = struct {
 
         return .{
             .allocator = allocator,
-            .name = if (options.name.len > 0) options.name else (cfg.app_name orelse "app"),
+            .name = if (options.name.len > 0) options.name else (cfg.app_name orelse constants.Defaults.program_name),
             .version = options.version orelse cfg.app_version,
             .description = options.description orelse cfg.app_description,
             .epilog = options.epilog orelse cfg.app_epilog,
@@ -283,7 +281,7 @@ pub const ArgumentParser = struct {
         help: ?[]const u8 = null,
         default: ?[]const u8 = null,
         required: bool = false,
-        metavar: ?[]const u8 = "PATH",
+        metavar: ?[]const u8 = constants.Metavars.path,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -315,7 +313,7 @@ pub const ArgumentParser = struct {
         help: ?[]const u8 = null,
         default: ?[]const u8 = null,
         required: bool = false,
-        metavar: ?[]const u8 = "ABS_PATH",
+        metavar: ?[]const u8 = constants.Metavars.abs_path,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -365,7 +363,7 @@ pub const ArgumentParser = struct {
             .help = options.help,
             .default = options.default,
             .required = options.required,
-            .metavar = "FILE",
+            .metavar = constants.Metavars.file,
             .dest = options.dest,
             .env_var = options.env_var,
             .hidden = options.hidden,
@@ -400,7 +398,7 @@ pub const ArgumentParser = struct {
             .help = options.help,
             .default = options.default,
             .required = options.required,
-            .metavar = "DIR",
+            .metavar = constants.Metavars.dir,
             .dest = options.dest,
             .env_var = options.env_var,
             .hidden = options.hidden,
@@ -444,7 +442,7 @@ pub const ArgumentParser = struct {
             .help = options.help,
             .default = options.default,
             .required = options.required,
-            .metavar = "FILE",
+            .metavar = constants.Metavars.file,
             .dest = options.dest,
             .env_var = options.env_var,
             .hidden = options.hidden,
@@ -483,7 +481,7 @@ pub const ArgumentParser = struct {
             .value_type = .string,
             .default = options.default,
             .required = options.required,
-            .metavar = "FILE_NAME",
+            .metavar = constants.Metavars.file_name,
             .dest = options.dest,
             .env_var = options.env_var,
             .hidden = options.hidden,
@@ -542,7 +540,7 @@ pub const ArgumentParser = struct {
         help: ?[]const u8 = null,
         default: ?[]const u8 = null,
         required: bool = false,
-        metavar: ?[]const u8 = "EMAIL",
+        metavar: ?[]const u8 = constants.Metavars.email,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -573,7 +571,7 @@ pub const ArgumentParser = struct {
         help: ?[]const u8 = null,
         default: ?[]const u8 = null,
         required: bool = false,
-        metavar: ?[]const u8 = "URL",
+        metavar: ?[]const u8 = constants.Metavars.url,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -604,7 +602,7 @@ pub const ArgumentParser = struct {
         help: ?[]const u8 = null,
         default: ?[]const u8 = null,
         required: bool = false,
-        metavar: ?[]const u8 = "IPV4",
+        metavar: ?[]const u8 = constants.Metavars.ipv4,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -635,7 +633,7 @@ pub const ArgumentParser = struct {
         help: ?[]const u8 = null,
         default: ?[]const u8 = null,
         required: bool = false,
-        metavar: ?[]const u8 = "IP",
+        metavar: ?[]const u8 = constants.Metavars.ip,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -666,7 +664,7 @@ pub const ArgumentParser = struct {
         help: ?[]const u8 = null,
         default: ?[]const u8 = null,
         required: bool = false,
-        metavar: ?[]const u8 = "IPV6",
+        metavar: ?[]const u8 = constants.Metavars.ipv6,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -697,7 +695,7 @@ pub const ArgumentParser = struct {
         help: ?[]const u8 = null,
         default: ?[]const u8 = null,
         required: bool = false,
-        metavar: ?[]const u8 = "HOST",
+        metavar: ?[]const u8 = constants.Metavars.host,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -728,7 +726,7 @@ pub const ArgumentParser = struct {
         help: ?[]const u8 = null,
         default: ?[]const u8 = null,
         required: bool = false,
-        metavar: ?[]const u8 = "UUID",
+        metavar: ?[]const u8 = constants.Metavars.uuid,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -759,7 +757,7 @@ pub const ArgumentParser = struct {
         help: ?[]const u8 = null,
         default: ?[]const u8 = null,
         required: bool = false,
-        metavar: ?[]const u8 = "YYYY-MM-DD",
+        metavar: ?[]const u8 = constants.Metavars.iso_date,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -790,7 +788,7 @@ pub const ArgumentParser = struct {
         help: ?[]const u8 = null,
         default: ?[]const u8 = null,
         required: bool = false,
-        metavar: ?[]const u8 = "YYYY-MM-DDTHH:MM:SSZ",
+        metavar: ?[]const u8 = constants.Metavars.iso_datetime,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -821,7 +819,7 @@ pub const ArgumentParser = struct {
         help: ?[]const u8 = null,
         default: ?[]const u8 = null,
         required: bool = false,
-        metavar: ?[]const u8 = "JSON",
+        metavar: ?[]const u8 = constants.Metavars.json,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -852,7 +850,7 @@ pub const ArgumentParser = struct {
         help: ?[]const u8 = null,
         default: ?[]const u8 = null,
         required: bool = false,
-        metavar: ?[]const u8 = "KEY=VALUE",
+        metavar: ?[]const u8 = constants.Metavars.key_value,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -892,7 +890,7 @@ pub const ArgumentParser = struct {
         help: ?[]const u8 = null,
         default: ?[]const u8 = null,
         required: bool = false,
-        metavar: ?[]const u8 = "YYYY",
+        metavar: ?[]const u8 = constants.Metavars.year,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -923,7 +921,7 @@ pub const ArgumentParser = struct {
         help: ?[]const u8 = null,
         default: ?[]const u8 = null,
         required: bool = false,
-        metavar: ?[]const u8 = "HH:MM",
+        metavar: ?[]const u8 = constants.Metavars.time,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -954,7 +952,7 @@ pub const ArgumentParser = struct {
         help: ?[]const u8 = null,
         default: ?[]const u8 = null,
         required: bool = false,
-        metavar: ?[]const u8 = "PORT",
+        metavar: ?[]const u8 = constants.Metavars.port,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -985,7 +983,7 @@ pub const ArgumentParser = struct {
         help: ?[]const u8 = null,
         default: ?[]const u8 = null,
         required: bool = false,
-        metavar: ?[]const u8 = "HOST:PORT",
+        metavar: ?[]const u8 = constants.Metavars.endpoint,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -1047,7 +1045,7 @@ pub const ArgumentParser = struct {
         help: ?[]const u8 = null,
         default: ?[]const u8 = null,
         required: bool = false,
-        metavar: ?[]const u8 = "BASE64",
+        metavar: ?[]const u8 = constants.Metavars.base64,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -1086,7 +1084,7 @@ pub const ArgumentParser = struct {
         help: ?[]const u8 = null,
         default: ?[]const u8 = null,
         required: bool = false,
-        metavar: ?[]const u8 = "INT",
+        metavar: ?[]const u8 = constants.Metavars.int,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -1125,7 +1123,7 @@ pub const ArgumentParser = struct {
         help: ?[]const u8 = null,
         default: ?[]const u8 = null,
         required: bool = false,
-        metavar: ?[]const u8 = "FLOAT",
+        metavar: ?[]const u8 = constants.Metavars.float,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -1164,7 +1162,7 @@ pub const ArgumentParser = struct {
         help: ?[]const u8 = null,
         default: ?[]const u8 = null,
         required: bool = false,
-        metavar: ?[]const u8 = "UINT",
+        metavar: ?[]const u8 = constants.Metavars.uint,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -1203,7 +1201,7 @@ pub const ArgumentParser = struct {
         help: ?[]const u8 = null,
         default: ?[]const u8 = null,
         required: bool = false,
-        metavar: ?[]const u8 = "HEX",
+        metavar: ?[]const u8 = constants.Metavars.hex,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -1240,16 +1238,16 @@ pub const ArgumentParser = struct {
     /// `--verbose` increments a counter, `--quiet` decrements it.
     /// The result can be read with `result.get("verbose")` as an integer.
     pub fn addLogLevel(self: *ArgumentParser, verbose_options: struct {
-        name: []const u8 = "verbose",
+        name: []const u8 = constants.Defaults.verbose_name,
         short: ?u8 = 'v',
-        help: ?[]const u8 = "Increase verbosity level",
+        help: ?[]const u8 = constants.Defaults.verbose_help,
         dest: ?[]const u8 = null,
         hidden: bool = false,
         aliases: []const []const u8 = &.{},
     }, quiet_options: struct {
-        name: []const u8 = "quiet",
+        name: []const u8 = constants.Defaults.quiet_name,
         short: ?u8 = 'q',
-        help: ?[]const u8 = "Decrease verbosity level (suppress output)",
+        help: ?[]const u8 = constants.Defaults.quiet_help,
         dest: ?[]const u8 = null,
         hidden: bool = false,
         aliases: []const []const u8 = &.{},
@@ -1257,7 +1255,7 @@ pub const ArgumentParser = struct {
         try self.addCounter(verbose_options.name, .{
             .short = verbose_options.short,
             .help = verbose_options.help,
-            .dest = verbose_options.dest orelse "verbose",
+            .dest = verbose_options.dest orelse constants.Defaults.verbose_name,
         });
         try self.addArg(.{
             .name = quiet_options.name,
@@ -1267,7 +1265,7 @@ pub const ArgumentParser = struct {
             .help = quiet_options.help,
             .action = .count,
             .value_type = .counter,
-            .dest = quiet_options.dest orelse "verbose",
+            .dest = quiet_options.dest orelse constants.Defaults.verbose_name,
             .hidden = quiet_options.hidden,
         });
     }
@@ -1280,7 +1278,7 @@ pub const ArgumentParser = struct {
         help: ?[]const u8 = null,
         default: ?[]const u8 = null,
         required: bool = false,
-        metavar: ?[]const u8 = "LIST",
+        metavar: ?[]const u8 = constants.Metavars.list,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -1440,9 +1438,9 @@ pub const ArgumentParser = struct {
 
     /// Adds a conventional `--all` flag used by many command-line tools.
     pub fn addAllFlag(self: *ArgumentParser, options: struct {
-        name: []const u8 = "all",
+        name: []const u8 = constants.Defaults.all_name,
         short: ?u8 = null,
-        help: ?[]const u8 = "Select all items",
+        help: ?[]const u8 = constants.Defaults.all_help,
         dest: ?[]const u8 = null,
         hidden: bool = false,
         aliases: []const []const u8 = &.{},
@@ -1460,9 +1458,9 @@ pub const ArgumentParser = struct {
 
     /// Adds a conventional `--select` option used to target a subset of items.
     pub fn addSelectOption(self: *ArgumentParser, options: struct {
-        name: []const u8 = "select",
+        name: []const u8 = constants.Defaults.select_name,
         short: ?u8 = null,
-        help: ?[]const u8 = "Select specific items",
+        help: ?[]const u8 = constants.Defaults.select_help,
         value_type: ValueType = .string,
         default: ?[]const u8 = null,
         required: bool = false,
@@ -1496,12 +1494,12 @@ pub const ArgumentParser = struct {
 
     /// Adds a conventional CSV-based `--select` option for multi-target workflows.
     pub fn addSelectCsvOption(self: *ArgumentParser, options: struct {
-        name: []const u8 = "select",
+        name: []const u8 = constants.Defaults.select_name,
         short: ?u8 = null,
-        help: ?[]const u8 = "Select specific items (comma-separated)",
+        help: ?[]const u8 = constants.Defaults.select_csv_help,
         default: ?[]const u8 = null,
         required: bool = false,
-        metavar: ?[]const u8 = "LIST",
+        metavar: ?[]const u8 = constants.Metavars.list,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -1529,12 +1527,12 @@ pub const ArgumentParser = struct {
 
     /// Adds an exclusive selection pair (`--select` vs `--all`) commonly used in CMD/CLI tools.
     pub fn addSelectOrAll(self: *ArgumentParser, options: struct {
-        group_name: []const u8 = "Selection",
-        group_description: ?[]const u8 = "Target selection options",
+        group_name: []const u8 = constants.Defaults.selection_group,
+        group_description: ?[]const u8 = constants.Defaults.selection_group_desc,
         required: bool = false,
-        select_name: []const u8 = "select",
+        select_name: []const u8 = constants.Defaults.select_name,
         select_short: ?u8 = null,
-        select_help: ?[]const u8 = "Select specific items",
+        select_help: ?[]const u8 = constants.Defaults.select_help,
         select_value_type: ValueType = .string,
         select_default: ?[]const u8 = null,
         select_choices: []const []const u8 = &.{},
@@ -1545,9 +1543,9 @@ pub const ArgumentParser = struct {
         select_deprecated: ?[]const u8 = null,
         select_validator: ?validation.ValidatorFn = null,
         select_expect: []const []const u8 = &.{},
-        all_name: []const u8 = "all",
+        all_name: []const u8 = constants.Defaults.all_name,
         all_short: ?u8 = null,
-        all_help: ?[]const u8 = "Select all items",
+        all_help: ?[]const u8 = constants.Defaults.all_help,
         all_dest: ?[]const u8 = null,
         all_aliases: []const []const u8 = &.{},
         all_deprecated: ?[]const u8 = null,
@@ -1588,23 +1586,23 @@ pub const ArgumentParser = struct {
 
     /// Adds a CSV-oriented exclusive pair (`--select users,groups` vs `--all`).
     pub fn addSelectOrAllCsv(self: *ArgumentParser, options: struct {
-        group_name: []const u8 = "Selection",
-        group_description: ?[]const u8 = "Target selection options",
+        group_name: []const u8 = constants.Defaults.selection_group,
+        group_description: ?[]const u8 = constants.Defaults.selection_group_desc,
         required: bool = false,
-        select_name: []const u8 = "select",
+        select_name: []const u8 = constants.Defaults.select_name,
         select_short: ?u8 = null,
-        select_help: ?[]const u8 = "Select specific items (comma-separated)",
+        select_help: ?[]const u8 = constants.Defaults.select_csv_help,
         select_default: ?[]const u8 = null,
-        select_metavar: ?[]const u8 = "LIST",
+        select_metavar: ?[]const u8 = constants.Metavars.list,
         select_dest: ?[]const u8 = null,
         select_env_var: ?[]const u8 = null,
         select_aliases: []const []const u8 = &.{},
         select_deprecated: ?[]const u8 = null,
         select_validator: ?validation.ValidatorFn = validation.Validators.nonEmpty,
         select_expect: []const []const u8 = &.{},
-        all_name: []const u8 = "all",
+        all_name: []const u8 = constants.Defaults.all_name,
         all_short: ?u8 = null,
-        all_help: ?[]const u8 = "Select all items",
+        all_help: ?[]const u8 = constants.Defaults.all_help,
         all_dest: ?[]const u8 = null,
         all_aliases: []const []const u8 = &.{},
         all_deprecated: ?[]const u8 = null,
@@ -1643,9 +1641,9 @@ pub const ArgumentParser = struct {
 
     /// Adds a conventional `--include` option for comma-separated target filters.
     pub fn addIncludeOption(self: *ArgumentParser, options: struct {
-        name: []const u8 = "include",
+        name: []const u8 = constants.Defaults.include_name,
         short: ?u8 = null,
-        help: ?[]const u8 = "Comma-separated include filters",
+        help: ?[]const u8 = constants.Defaults.include_help,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -1666,9 +1664,9 @@ pub const ArgumentParser = struct {
 
     /// Adds a conventional `--exclude` option for comma-separated target filters.
     pub fn addExcludeOption(self: *ArgumentParser, options: struct {
-        name: []const u8 = "exclude",
+        name: []const u8 = constants.Defaults.exclude_name,
         short: ?u8 = null,
-        help: ?[]const u8 = "Comma-separated exclude filters",
+        help: ?[]const u8 = constants.Defaults.exclude_help,
         dest: ?[]const u8 = null,
         env_var: ?[]const u8 = null,
         hidden: bool = false,
@@ -1689,18 +1687,18 @@ pub const ArgumentParser = struct {
 
     /// Adds both include/exclude filters under a shared group for better help organization.
     pub fn addIncludeExclude(self: *ArgumentParser, options: struct {
-        group_name: []const u8 = "Filters",
-        group_description: ?[]const u8 = "Target filtering options",
-        include_name: []const u8 = "include",
+        group_name: []const u8 = constants.Defaults.filters_group,
+        group_description: ?[]const u8 = constants.Defaults.filters_group_desc,
+        include_name: []const u8 = constants.Defaults.include_name,
         include_short: ?u8 = null,
-        include_help: ?[]const u8 = "Comma-separated include filters",
+        include_help: ?[]const u8 = constants.Defaults.include_help,
         include_dest: ?[]const u8 = null,
         include_env_var: ?[]const u8 = null,
         include_aliases: []const []const u8 = &.{},
         include_deprecated: ?[]const u8 = null,
-        exclude_name: []const u8 = "exclude",
+        exclude_name: []const u8 = constants.Defaults.exclude_name,
         exclude_short: ?u8 = null,
-        exclude_help: ?[]const u8 = "Comma-separated exclude filters",
+        exclude_help: ?[]const u8 = constants.Defaults.exclude_help,
         exclude_dest: ?[]const u8 = null,
         exclude_env_var: ?[]const u8 = null,
         exclude_aliases: []const []const u8 = &.{},
@@ -2546,12 +2544,12 @@ pub fn resolveIncludeExcludeStrict(
 fn writePromptMenu(writer: *std.Io.Writer, options: PromptSelectOrAllOptions) !void {
     try writer.print("{s}:\n", .{options.question});
     if (options.allow_all) {
-        try writer.writeAll("  0) all\n");
+        try writer.writeAll(constants.PromptText.all_menu);
     }
     for (options.choices, 0..) |choice, idx| {
         try writer.print("  {d}) {s}\n", .{ idx + 1, choice });
     }
-    try writer.writeAll("Enter number or name: ");
+    try writer.writeAll(constants.PromptText.enter_prompt);
 }
 
 pub fn resolveSelectOrAllWithPromptIO(
@@ -2593,18 +2591,18 @@ pub fn resolveSelectOrAllWithPromptIO(
 
         if (answer.len == 0) {
             if (options.default_choice) |def| {
-                if (options.allow_all and equalsWithCase(def, "all", case_sensitive)) {
+                if (options.allow_all and equalsWithCase(def, constants.PromptText.all_label, case_sensitive)) {
                     return .{ .all = {} };
                 }
                 if (pickChoiceByName(def, options.choices, case_sensitive)) |matched| {
                     return .{ .selected = matched };
                 }
             }
-            try writer.writeAll("Invalid selection. Try again.\n");
+            try writer.writeAll(constants.PromptText.invalid_selection);
             continue;
         }
 
-        if (options.allow_all and (equalsWithCase(answer, "all", case_sensitive) or std.mem.eql(u8, answer, "0"))) {
+        if (options.allow_all and (equalsWithCase(answer, constants.PromptText.all_label, case_sensitive) or std.mem.eql(u8, answer, "0"))) {
             return .{ .all = {} };
         }
 
@@ -2627,11 +2625,11 @@ pub fn resolveSelectOrAllWithPromptIO(
 
         if (options.suggest_closest and options.choices.len > 0) {
             if (utils.findClosest(answer, options.choices, options.max_suggestion_distance)) |suggestion| {
-                try writer.print("Did you mean '{s}'?\n", .{suggestion});
+                try writer.print(constants.PromptText.did_you_mean, .{suggestion});
             }
         }
 
-        try writer.writeAll("Invalid selection. Try again.\n");
+        try writer.writeAll(constants.PromptText.invalid_selection);
     }
 
     return error.InvalidValue;
@@ -2898,7 +2896,7 @@ test "disableUpdateCheck and enableUpdateCheck" {
 
 test "getLibraryVersion" {
     const ver = getLibraryVersion();
-    try std.testing.expectEqualStrings("0.0.5", ver);
+    try std.testing.expectEqualStrings("0.0.6", ver);
 }
 
 test "ArgumentParser subcommand" {

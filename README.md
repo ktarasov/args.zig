@@ -83,10 +83,10 @@ A production-grade, high-performance command-line argument parsing library for Z
 
 ### Release Installation (Recommended)
 
-Install the latest stable release for zig v0.16 (v0.0.5):
+Install the latest stable release for zig v0.16 (v0.0.6):
 
 ```bash
-zig fetch --save https://github.com/muhammad-fiaz/args.zig/archive/refs/tags/0.0.5.tar.gz
+zig fetch --save https://github.com/muhammad-fiaz/args.zig/archive/refs/tags/0.0.6.tar.gz
 ```
 
 Install the supported release for zig v0.15 (v0.0.4):

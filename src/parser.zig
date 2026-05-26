@@ -11,6 +11,7 @@ const errors = @import("errors.zig");
 const help = @import("help.zig");
 const config_mod = @import("config.zig");
 const utils = @import("utils.zig");
+const constants = @import("constants.zig");
 
 pub const ParseResult = types.ParseResult;
 pub const ParsedValue = types.ParsedValue;
@@ -296,13 +297,15 @@ pub const Parser = struct {
 
     fn emitError(self: *Parser, comptime fmt: []const u8, args_tuple: anytype) void {
         if (self.cfg.silent_errors) return;
-        std.debug.print("{s}: ", .{self.cfg.error_prefix});
+        const theme = utils.resolveTheme(self.cfg.use_colors, self.cfg.colors);
+        std.debug.print("{s}{s}{s}: ", .{ theme.error_color, self.cfg.error_prefix, theme.reset });
         std.debug.print(fmt, args_tuple);
     }
 
     fn emitWarning(self: *Parser, comptime fmt: []const u8, args_tuple: anytype) void {
         if (self.cfg.silent_errors) return;
-        std.debug.print("{s}: ", .{self.cfg.warning_prefix});
+        const theme = utils.resolveTheme(self.cfg.use_colors, self.cfg.colors);
+        std.debug.print("{s}{s}{s}: ", .{ theme.warning, self.cfg.warning_prefix, theme.reset });
         std.debug.print(fmt, args_tuple);
     }
 
@@ -310,14 +313,14 @@ pub const Parser = struct {
         if (!self.cfg.suggest_closest) return;
         if (utils.findClosest(entered, candidates, self.cfg.suggestion_max_distance)) |sug| {
             if (!self.cfg.silent_errors) {
-                std.debug.print("\n\tDid you mean '{s}{s}'?\n", .{ prefix, sug });
+                std.debug.print(constants.ParserMessages.did_you_mean, .{ prefix, sug });
             }
         }
     }
 
     fn emitClosestSuggestionWithArgHint(self: *Parser, spec: *const ArgSpec, entered: []const u8, candidates: []const []const u8, prefix: []const u8) void {
         if (spec.suggestion_hint) |hint| {
-            if (!self.cfg.silent_errors) std.debug.print("\n\tHint: {s}\n", .{hint});
+            if (!self.cfg.silent_errors) std.debug.print(constants.ParserMessages.hint, .{hint});
             return;
         }
         self.emitClosestSuggestion(entered, candidates, prefix);
@@ -328,11 +331,11 @@ pub const Parser = struct {
         if (self.cfg.unknown_option_message) |custom| {
             self.emitError("{s}\n", .{custom});
         } else {
-            self.emitError("Unknown option '{s}{s}'\n", .{ prefix, name });
+            self.emitError(constants.ParserMessages.unknown_option, .{ prefix, name });
         }
 
         if (self.cfg.unknown_option_hint) |hint| {
-            if (!self.cfg.silent_errors) std.debug.print("\n\tHint: {s}\n", .{hint});
+            if (!self.cfg.silent_errors) std.debug.print(constants.ParserMessages.hint, .{hint});
             return;
         }
 
@@ -344,8 +347,8 @@ pub const Parser = struct {
 
             if (self.cfg.suggest_builtin_commands) {
                 // Include built-in pseudo options so typos like --verison can be corrected.
-                candidates.append(self.allocator, "help") catch {};
-                candidates.append(self.allocator, "version") catch {};
+                candidates.append(self.allocator, constants.Builtins.help) catch {};
+                candidates.append(self.allocator, constants.Builtins.version) catch {};
             }
 
             self.emitClosestSuggestion(name, candidates.items, "--");
@@ -356,11 +359,11 @@ pub const Parser = struct {
         if (self.cfg.unknown_subcommand_message) |custom| {
             self.emitError("{s}\n", .{custom});
         } else {
-            self.emitError("Unknown subcommand '{s}'\n", .{entered});
+            self.emitError(constants.ParserMessages.unknown_subcommand, .{entered});
         }
 
         if (self.cfg.unknown_subcommand_hint) |hint| {
-            if (!self.cfg.silent_errors) std.debug.print("\n\tHint: {s}\n", .{hint});
+            if (!self.cfg.silent_errors) std.debug.print(constants.ParserMessages.hint, .{hint});
             return;
         }
 
@@ -455,15 +458,15 @@ pub const Parser = struct {
             self.getLongArgSpec(name);
 
         if (arg_spec == null) {
-            if (!is_short and utils.eql(name, "help")) {
+            if (!is_short and utils.eql(name, constants.Builtins.help)) {
                 const help_text = try help.generateHelpWithConfig(self.allocator, self.spec, self.cfg.use_colors, self.cfg);
                 std.debug.print("{s}", .{help_text});
                 self.allocator.free(help_text);
                 if (self.cfg.exit_on_error) std.process.exit(0);
                 return;
             }
-            if (!is_short and utils.eql(name, "version")) {
-                std.debug.print("{s} {s}\n", .{ self.spec.name, self.spec.version orelse "unknown" });
+            if (!is_short and utils.eql(name, constants.Builtins.version)) {
+                std.debug.print("{s} {s}\n", .{ self.spec.name, self.spec.version orelse constants.Defaults.unknown_version });
                 if (self.cfg.exit_on_error) std.process.exit(0);
                 return;
             }
@@ -475,7 +478,7 @@ pub const Parser = struct {
                 return;
             }
             if (is_short and name[0] == 'V') {
-                std.debug.print("{s} {s}\n", .{ self.spec.name, self.spec.version orelse "unknown" });
+                std.debug.print("{s} {s}\n", .{ self.spec.name, self.spec.version orelse constants.Defaults.unknown_version });
                 if (self.cfg.exit_on_error) std.process.exit(0);
                 return;
             }
@@ -518,7 +521,7 @@ pub const Parser = struct {
                     if (spec.custom_error_message) |custom| {
                         self.emitError("{s}\n", .{custom});
                     } else {
-                        self.emitError("failed to decode value for argument '{s}'\n", .{spec.name});
+                        self.emitError(constants.ParserMessages.decode_failed, .{spec.name});
                     }
                     return errors.ParseError.InvalidValue;
                 };
@@ -563,7 +566,7 @@ pub const Parser = struct {
                     if (spec.custom_error_message) |custom| {
                         self.emitError("{s}\n", .{custom});
                     } else {
-                        self.emitError("failed to decode value for argument '{s}'\n", .{spec.name});
+                        self.emitError(constants.ParserMessages.decode_failed, .{spec.name});
                     }
                     return errors.ParseError.InvalidValue;
                 };
@@ -583,7 +586,7 @@ pub const Parser = struct {
                     if (spec.custom_error_message) |custom| {
                         self.emitError("{s}\n", .{custom});
                     } else {
-                        self.emitError("invalid choice '{s}' for argument '{s}'\n", .{ decoded.value, spec.name });
+                        self.emitError(constants.ParserMessages.invalid_choice, .{ decoded.value, spec.name });
                     }
                     self.emitClosestSuggestionWithArgHint(spec, decoded.value, spec.choices, "");
                     return errors.ParseError.InvalidChoice;
@@ -594,7 +597,7 @@ pub const Parser = struct {
                             if (spec.custom_error_message) |custom| {
                                 self.emitError("{s}\n", .{custom});
                             } else {
-                                self.emitError("Value '{s}' is not in expected list for argument '{s}'. Expected one of: ", .{ decoded.value, spec.name });
+                                self.emitError(constants.ParserMessages.expected_one_of, .{ decoded.value, spec.name });
                             }
                             if (!self.cfg.silent_errors) {
                                 if (spec.custom_error_message == null) {
@@ -613,7 +616,7 @@ pub const Parser = struct {
                             if (spec.custom_error_message) |custom| {
                                 self.emitWarning("{s}\n", .{custom});
                             } else {
-                                self.emitWarning("Value '{s}' is unexpected for argument '{s}'. Expected one of: ", .{ decoded.value, spec.name });
+                                self.emitWarning(constants.ParserMessages.unexpected_value, .{ decoded.value, spec.name });
                             }
                             if (!self.cfg.silent_errors) {
                                 if (spec.custom_error_message == null) {
@@ -643,7 +646,7 @@ pub const Parser = struct {
                 if (self.cfg.exit_on_error) std.process.exit(0);
             },
             .version => {
-                std.debug.print("{s} {s}\n", .{ self.spec.name, self.spec.version orelse "unknown" });
+                std.debug.print("{s} {s}\n", .{ self.spec.name, self.spec.version orelse constants.Defaults.unknown_version });
                 if (self.cfg.exit_on_error) std.process.exit(0);
             },
             else => {},
@@ -684,7 +687,7 @@ pub const Parser = struct {
             if (spec.custom_error_message) |custom| {
                 self.emitError("{s}\n", .{custom});
             } else {
-                self.emitError("failed to decode value for argument '{s}'\n", .{spec.name});
+                self.emitError(constants.ParserMessages.decode_failed, .{spec.name});
             }
             return errors.ParseError.InvalidValue;
         };
@@ -713,7 +716,7 @@ pub const Parser = struct {
             if (spec.custom_error_message) |custom| {
                 self.emitError("{s}\n", .{custom});
             } else {
-                self.emitError("invalid choice '{s}' for argument '{s}'\n", .{ decoded.value, spec.name });
+                self.emitError(constants.ParserMessages.invalid_choice, .{ decoded.value, spec.name });
             }
             self.emitClosestSuggestionWithArgHint(spec, decoded.value, spec.choices, "");
             return errors.ParseError.InvalidChoice;
@@ -725,7 +728,7 @@ pub const Parser = struct {
                     if (spec.custom_error_message) |custom| {
                         self.emitError("{s}\n", .{custom});
                     } else {
-                        self.emitError("Value '{s}' is not in expected list for argument '{s}'. Expected one of: ", .{ decoded.value, spec.name });
+                        self.emitError(constants.ParserMessages.expected_one_of, .{ decoded.value, spec.name });
                     }
                     if (!self.cfg.silent_errors) {
                         if (spec.custom_error_message == null) {
@@ -743,7 +746,7 @@ pub const Parser = struct {
                     if (spec.custom_error_message) |custom| {
                         self.emitWarning("{s}\n", .{custom});
                     } else {
-                        self.emitWarning("Value '{s}' is unexpected for argument '{s}'. Expected one of: ", .{ decoded.value, spec.name });
+                        self.emitWarning(constants.ParserMessages.unexpected_value, .{ decoded.value, spec.name });
                     }
                     if (!self.cfg.silent_errors) {
                         if (spec.custom_error_message == null) {

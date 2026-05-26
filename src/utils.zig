@@ -99,6 +99,73 @@ pub const Color = struct {
     }
 };
 
+pub const ColorTheme = struct {
+    reset: []const u8,
+    bold: []const u8,
+    dim: []const u8,
+    header: []const u8,
+    section: []const u8,
+    option: []const u8,
+    argument: []const u8,
+    meta: []const u8,
+    warning: []const u8,
+    error_color: []const u8,
+    accent: []const u8,
+
+    pub fn standard() ColorTheme {
+        return .{
+            .reset = Color.reset,
+            .bold = Color.bold,
+            .dim = Color.dim,
+            .header = Color.yellow,
+            .section = Color.yellow,
+            .option = Color.green,
+            .argument = Color.cyan,
+            .meta = Color.dim,
+            .warning = Color.yellow,
+            .error_color = Color.red,
+            .accent = Color.cyan,
+        };
+    }
+
+    pub fn bright() ColorTheme {
+        return .{
+            .reset = Color.reset,
+            .bold = Color.bold,
+            .dim = Color.dim,
+            .header = Color.bright_yellow,
+            .section = Color.bright_yellow,
+            .option = Color.bright_green,
+            .argument = Color.bright_cyan,
+            .meta = Color.dim,
+            .warning = Color.bright_yellow,
+            .error_color = Color.bright_red,
+            .accent = Color.bright_cyan,
+        };
+    }
+
+    pub fn none() ColorTheme {
+        return .{
+            .reset = "",
+            .bold = "",
+            .dim = "",
+            .header = "",
+            .section = "",
+            .option = "",
+            .argument = "",
+            .meta = "",
+            .warning = "",
+            .error_color = "",
+            .accent = "",
+        };
+    }
+};
+
+pub fn resolveTheme(use_colors: bool, theme: ?ColorTheme) ColorTheme {
+    if (!use_colors) return ColorTheme.none();
+    return theme orelse ColorTheme.standard();
+}
+
 /// Parse integer with error handling.
 pub inline fn parseInt(comptime T: type, s: []const u8) ?T {
     return std.fmt.parseInt(T, s, 10) catch null;
@@ -358,6 +425,14 @@ test "inRange" {
 test "Color.get" {
     try std.testing.expectEqualStrings("\x1b[31m", Color.get(Color.red, true));
     try std.testing.expectEqualStrings("", Color.get(Color.red, false));
+}
+
+test "resolveTheme" {
+    const std_theme = resolveTheme(true, null);
+    try std.testing.expectEqualStrings(Color.yellow, std_theme.header);
+
+    const none = resolveTheme(false, null);
+    try std.testing.expectEqualStrings("", none.option);
 }
 
 test "calcPadding" {

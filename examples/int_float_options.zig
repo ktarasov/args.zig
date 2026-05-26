@@ -33,7 +33,7 @@ pub fn main(init: std.process.Init) !void {
     });
 
     try parser.addFloatOption("threshold", .{
-        .short = 'h',
+        .short = 's',
         .help = "Confidence threshold",
         .default = "0.75",
     });

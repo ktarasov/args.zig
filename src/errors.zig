@@ -82,6 +82,7 @@ pub const ErrorContext = struct {
 };
 
 const utils = @import("utils.zig");
+const constants = @import("constants.zig");
 
 /// Calculate Levenshtein distance between two strings for suggestions (delegates to utils).
 pub const levenshteinDistance = utils.editDistance;
@@ -92,24 +93,24 @@ pub const findClosestMatch = utils.findClosest;
 /// Format a parse error for display.
 pub fn formatParseError(err: anyerror) []const u8 {
     return switch (err) {
-        error.UnknownOption => "unknown option",
-        error.MissingRequired => "missing required argument",
-        error.MissingValue => "missing value for option",
-        error.InvalidValue => "invalid value",
-        error.TooManyValues => "too many values provided",
-        error.TooFewValues => "too few values provided",
-        error.InvalidChoice => "invalid choice",
-        error.ConflictingArguments => "conflicting arguments",
-        error.MissingDependency => "missing required dependency",
-        error.DuplicateArgument => "duplicate argument",
-        error.InvalidFormat => "invalid argument format",
-        error.UnexpectedPositional => "unexpected positional argument",
-        error.UnknownSubcommand => "unknown subcommand",
-        error.MissingSubcommand => "missing subcommand",
-        error.MutuallyExclusive => "mutually exclusive arguments used together",
-        error.OutOfMemory => "out of memory",
-        error.Overflow => "numeric overflow",
-        error.InvalidCharacter => "invalid character in value",
+        error.UnknownOption => constants.ErrorMessages.parse_unknown_option,
+        error.MissingRequired => constants.ErrorMessages.parse_missing_required,
+        error.MissingValue => constants.ErrorMessages.parse_missing_value,
+        error.InvalidValue => constants.ErrorMessages.parse_invalid_value,
+        error.TooManyValues => constants.ErrorMessages.parse_too_many_values,
+        error.TooFewValues => constants.ErrorMessages.parse_too_few_values,
+        error.InvalidChoice => constants.ErrorMessages.parse_invalid_choice,
+        error.ConflictingArguments => constants.ErrorMessages.parse_conflicting_arguments,
+        error.MissingDependency => constants.ErrorMessages.parse_missing_dependency,
+        error.DuplicateArgument => constants.ErrorMessages.parse_duplicate_argument,
+        error.InvalidFormat => constants.ErrorMessages.parse_invalid_format,
+        error.UnexpectedPositional => constants.ErrorMessages.parse_unexpected_positional,
+        error.UnknownSubcommand => constants.ErrorMessages.parse_unknown_subcommand,
+        error.MissingSubcommand => constants.ErrorMessages.parse_missing_subcommand,
+        error.MutuallyExclusive => constants.ErrorMessages.parse_mutually_exclusive,
+        error.OutOfMemory => constants.ErrorMessages.parse_out_of_memory,
+        error.Overflow => constants.ErrorMessages.parse_overflow,
+        error.InvalidCharacter => constants.ErrorMessages.parse_invalid_character,
         else => @errorName(err),
     };
 }
@@ -117,37 +118,37 @@ pub fn formatParseError(err: anyerror) []const u8 {
 /// Format a schema definition error for display.
 pub fn formatSchemaError(err: SchemaError) []const u8 {
     return switch (err) {
-        SchemaError.DuplicateArgument => "duplicate argument",
-        SchemaError.InvalidShortName => "invalid short name",
-        SchemaError.InvalidLongName => "invalid long name",
-        SchemaError.MissingName => "missing argument name",
-        SchemaError.EmptyName => "empty argument name",
-        SchemaError.DuplicateName => "duplicate argument name",
-        SchemaError.DuplicateAlias => "duplicate alias",
-        SchemaError.InvalidConfig => "invalid configuration",
-        SchemaError.PositionalAfterVariadic => "positional argument after variadic argument",
-        SchemaError.RequiredAfterOptional => "required argument after optional argument",
-        SchemaError.InvalidNargs => "invalid nargs specification",
-        SchemaError.InvalidDefault => "invalid default value",
-        SchemaError.InvalidChoices => "invalid choices list",
-        SchemaError.CircularDependency => "circular dependency",
-        SchemaError.SelfConflict => "argument conflicts with itself",
-        SchemaError.OutOfMemory => "out of memory",
+        SchemaError.DuplicateArgument => constants.ErrorMessages.schema_duplicate_argument,
+        SchemaError.InvalidShortName => constants.ErrorMessages.schema_invalid_short,
+        SchemaError.InvalidLongName => constants.ErrorMessages.schema_invalid_long,
+        SchemaError.MissingName => constants.ErrorMessages.schema_missing_name,
+        SchemaError.EmptyName => constants.ErrorMessages.schema_empty_name,
+        SchemaError.DuplicateName => constants.ErrorMessages.schema_duplicate_name,
+        SchemaError.DuplicateAlias => constants.ErrorMessages.schema_duplicate_alias,
+        SchemaError.InvalidConfig => constants.ErrorMessages.schema_invalid_config,
+        SchemaError.PositionalAfterVariadic => constants.ErrorMessages.schema_positional_after_variadic,
+        SchemaError.RequiredAfterOptional => constants.ErrorMessages.schema_required_after_optional,
+        SchemaError.InvalidNargs => constants.ErrorMessages.schema_invalid_nargs,
+        SchemaError.InvalidDefault => constants.ErrorMessages.schema_invalid_default,
+        SchemaError.InvalidChoices => constants.ErrorMessages.schema_invalid_choices,
+        SchemaError.CircularDependency => constants.ErrorMessages.schema_circular_dependency,
+        SchemaError.SelfConflict => constants.ErrorMessages.schema_self_conflict,
+        SchemaError.OutOfMemory => constants.ErrorMessages.schema_out_of_memory,
     };
 }
 
 /// Format a validation error for display.
 pub fn formatValidationError(err: ValidationError) []const u8 {
     return switch (err) {
-        ValidationError.OutOfRange => "value out of range",
-        ValidationError.TooShort => "value is too short",
-        ValidationError.TooLong => "value is too long",
-        ValidationError.PatternMismatch => "value does not match required pattern",
-        ValidationError.CustomValidationFailed => "custom validation failed",
-        ValidationError.FileNotFound => "file not found",
-        ValidationError.DirectoryNotFound => "directory not found",
-        ValidationError.PermissionDenied => "permission denied",
-        ValidationError.InvalidPath => "invalid path",
+        ValidationError.OutOfRange => constants.ErrorMessages.validation_out_of_range,
+        ValidationError.TooShort => constants.ErrorMessages.validation_too_short,
+        ValidationError.TooLong => constants.ErrorMessages.validation_too_long,
+        ValidationError.PatternMismatch => constants.ErrorMessages.validation_pattern_mismatch,
+        ValidationError.CustomValidationFailed => constants.ErrorMessages.validation_custom_failed,
+        ValidationError.FileNotFound => constants.ErrorMessages.validation_file_not_found,
+        ValidationError.DirectoryNotFound => constants.ErrorMessages.validation_directory_not_found,
+        ValidationError.PermissionDenied => constants.ErrorMessages.validation_permission_denied,
+        ValidationError.InvalidPath => constants.ErrorMessages.validation_invalid_path,
     };
 }
 

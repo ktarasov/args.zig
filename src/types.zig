@@ -1,6 +1,7 @@
 //! Core type definitions for args.zig argument parsing.
 
 const std = @import("std");
+const constants = @import("constants.zig");
 
 /// Represents all possible value types for command-line arguments.
 pub const ValueType = enum {
@@ -19,34 +20,34 @@ pub const ValueType = enum {
     /// Get the default value as a string for this type.
     pub fn defaultAsString(self: ValueType) []const u8 {
         return switch (self) {
-            .string => "",
-            .int => "0",
-            .uint => "0",
-            .float => "0.0",
-            .bool => "false",
-            .path => "",
-            .choice => "",
-            .array => "[]",
-            .counter => "0",
-            .custom => "",
-            .key_value => "",
+            .string => constants.TypeNames.default_string,
+            .int => constants.TypeNames.default_int,
+            .uint => constants.TypeNames.default_int,
+            .float => constants.TypeNames.default_float,
+            .bool => constants.TypeNames.default_bool,
+            .path => constants.TypeNames.default_string,
+            .choice => constants.TypeNames.default_string,
+            .array => constants.TypeNames.default_array,
+            .counter => constants.TypeNames.default_int,
+            .custom => constants.TypeNames.default_string,
+            .key_value => constants.TypeNames.default_string,
         };
     }
 
     /// Get the type name for help text.
     pub fn typeName(self: ValueType) []const u8 {
         return switch (self) {
-            .string => "STRING",
-            .int => "INT",
-            .uint => "UINT",
-            .float => "FLOAT",
-            .bool => "BOOL",
-            .path => "PATH",
-            .choice => "CHOICE",
-            .array => "ARRAY",
-            .counter => "N",
-            .custom => "VALUE",
-            .key_value => "KEY=VALUE",
+            .string => constants.TypeNames.string,
+            .int => constants.TypeNames.int,
+            .uint => constants.TypeNames.uint,
+            .float => constants.TypeNames.float,
+            .bool => constants.TypeNames.bool_name,
+            .path => constants.TypeNames.path,
+            .choice => constants.TypeNames.choice,
+            .array => constants.TypeNames.array,
+            .counter => constants.TypeNames.counter,
+            .custom => constants.TypeNames.custom,
+            .key_value => constants.TypeNames.key_value,
         };
     }
 

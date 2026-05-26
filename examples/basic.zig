@@ -73,7 +73,13 @@ pub fn main(init: std.process.Init) !void {
     });
 
     // Parse command line arguments
-    var result = try parser.parseProcess(init);
+    var result = parser.parseProcess(init) catch |err| {
+        if (err == args.ParseError.MissingRequired) {
+            try parser.printHelp();
+            return;
+        }
+        return err;
+    };
     defer result.deinit();
 
     // Access parsed values

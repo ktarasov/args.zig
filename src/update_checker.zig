@@ -3,8 +3,10 @@
 const std = @import("std");
 const network = @import("network.zig");
 const utils = @import("utils.zig");
+const config = @import("config.zig");
+const constants = @import("constants.zig");
 
-const GITHUB_REPO = "muhammad-fiaz/args.zig";
+const GITHUB_REPO = constants.UpdateChecker.github_repo;
 const CURRENT_VERSION = @import("version.zig").version;
 
 var check_performed_once = false;
@@ -36,52 +38,37 @@ pub const ReleaseInfo = struct {
 
 /// Compare two semantic version strings.
 pub fn compareVersions(current: []const u8, latest: []const u8) i32 {
-    var curr_major: u32 = 0;
-    var curr_minor: u32 = 0;
-    var curr_patch: u32 = 0;
-    var lat_major: u32 = 0;
-    var lat_minor: u32 = 0;
-    var lat_patch: u32 = 0;
+    const curr = parseSemver(current) orelse return 0;
+    const lat = parseSemver(latest) orelse return 0;
 
-    parseVersion(current, &curr_major, &curr_minor, &curr_patch);
-    parseVersion(latest, &lat_major, &lat_minor, &lat_patch);
-
-    if (lat_major > curr_major) return 1;
-    if (lat_major < curr_major) return -1;
-    if (lat_minor > curr_minor) return 1;
-    if (lat_minor < curr_minor) return -1;
-    if (lat_patch > curr_patch) return 1;
-    if (lat_patch < curr_patch) return -1;
-    return 0;
+    return switch (lat.order(curr)) {
+        .gt => 1,
+        .lt => -1,
+        .eq => 0,
+    };
 }
 
-fn parseVersion(ver: []const u8, major: *u32, minor: *u32, patch: *u32) void {
-    var stripped = ver;
-    if (ver.len > 0 and ver[0] == 'v') stripped = ver[1..];
-
-    var iter = std.mem.splitScalar(u8, stripped, '.');
-    if (iter.next()) |m| major.* = utils.parseUint(u32, m) orelse 0;
-    if (iter.next()) |m| minor.* = utils.parseUint(u32, m) orelse 0;
-    if (iter.next()) |p| {
-        var p_stripped = p;
-        if (utils.indexOf(p, '-')) |idx| p_stripped = p[0..idx];
-        patch.* = utils.parseUint(u32, p_stripped) orelse 0;
-    }
+fn parseSemver(text: []const u8) ?std.SemanticVersion {
+    var trimmed = text;
+    if (trimmed.len > 0 and trimmed[0] == 'v') trimmed = trimmed[1..];
+    if (trimmed.len == 0) return null;
+    return std.SemanticVersion.parse(trimmed) catch null;
 }
 
 /// Print update notification to stderr.
 pub fn printUpdateNotification(current: []const u8, latest: []const u8, url: []const u8, use_colors: bool) void {
-    const yellow = utils.Color.get(utils.Color.yellow, use_colors);
-    const green = utils.Color.get(utils.Color.green, use_colors);
-    const cyan = utils.Color.get(utils.Color.cyan, use_colors);
-    const reset = utils.Color.get(utils.Color.reset, use_colors);
-    const bold = utils.Color.get(utils.Color.bold, use_colors);
+    const theme = utils.resolveTheme(use_colors, config.getConfig().colors);
+    const border = theme.header;
+    const current_color = theme.accent;
+    const latest_color = theme.option;
+    const reset = theme.reset;
+    const bold = theme.bold;
 
     std.debug.print("\n", .{});
-    std.debug.print("{s}╭─────────────────────────────────────────────────────────╮{s}\n", .{ yellow, reset });
-    std.debug.print("{s}│{s}  A new version of {s}args.zig{s} is available: {s}{s}{s} → {s}{s}{s}  {s}│{s}\n", .{ yellow, reset, bold, reset, cyan, current, reset, green, latest, reset, yellow, reset });
-    std.debug.print("{s}│{s}  Run: {s}zig fetch --save {s}{s}                   {s}│{s}\n", .{ yellow, reset, cyan, url, reset, yellow, reset });
-    std.debug.print("{s}╰─────────────────────────────────────────────────────────╯{s}\n", .{ yellow, reset });
+    std.debug.print("{s}╭─────────────────────────────────────────────────────────╮{s}\n", .{ border, reset });
+    std.debug.print("{s}│{s}  A new version of {s}args.zig{s} is available: {s}{s}{s} → {s}{s}{s}  {s}│{s}\n", .{ border, reset, bold, reset, current_color, current, reset, latest_color, latest, reset, border, reset });
+    std.debug.print("{s}│{s}  Run: {s}zig fetch --save {s}{s}                   {s}│{s}\n", .{ border, reset, current_color, url, reset, border, reset });
+    std.debug.print("{s}╰─────────────────────────────────────────────────────────╯{s}\n", .{ border, reset });
     std.debug.print("\n", .{});
 }
 
