@@ -1,5 +1,13 @@
 const std = @import("std");
 
+inline fn passthruArgs(run: *std.Build.Step.Run, b: *std.Build) void {
+    if (comptime @hasDecl(std.Build.Step.Run, "addPassthruArgs")) {
+        run.addPassthruArgs();
+    } else {
+        if (b.args) |args| run.addArgs(args);
+    }
+}
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -21,16 +29,12 @@ pub fn build(b: *std.Build) void {
     });
     exe.root_module.addImport("args", args_module);
 
-    const install_exe = b.addInstallArtifact(exe, .{});
+    b.installArtifact(exe);
 
     const run_exe = b.addRunArtifact(exe);
-    run_exe.step.dependOn(&install_exe.step);
-    if (b.args) |args| {
-        run_exe.addArgs(args);
-    }
+    run_exe.step.dependOn(b.getInstallStep());
+    passthruArgs(run_exe, b);
 
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_exe.step);
-
-    b.installArtifact(exe);
 }

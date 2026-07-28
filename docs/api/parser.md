@@ -76,6 +76,7 @@ pub fn addFlag(self: *ArgumentParser, name: []const u8, options: struct {
     help: ?[]const u8 = null,
     dest: ?[]const u8 = null,
     hidden: bool = false,
+    aliases: []const []const u8 = &.{},
     deprecated: ?[]const u8 = null,
 }) !void
 ```
@@ -462,6 +463,8 @@ The parser includes one-call helpers for common input formats:
 - `addIsoDateTimeOption`
 - `addYearOption`
 - `addTimeOption`
+- `addUnixTimestampOption`
+- `addDateFlexibleOption`
 - `addJsonOption`
 - `addAbsolutePathOption`
 
@@ -975,12 +978,11 @@ pub fn addBracketedListOption(self: *ArgumentParser, name: []const u8, options: 
     help: ?[]const u8 = null,
     metavar: ?[]const u8 = null,
     dest: ?[]const u8 = null,
-    bracket_type: ?types.BracketType = null,
 }) !void
 ```
 
 Adds an option that parses bracket-delimited inline lists — `{a,b,c}`, `[a,b,c]`, `<a,b,c>`.
-When no `bracket_type` is specified, all bracket types are auto-detected.
+Bracket detection is automatic and controlled by the `allow_brackets` config setting.
 
 **Example:**
 ```zig
@@ -1317,6 +1319,26 @@ defer result.deinit();
 std.debug.print("Count: {d}\n", .{result.options.count});
 ```
 
+### `parseProcessInto` (Convenience Function)
+
+```zig
+pub fn parseProcessInto(
+    allocator: std.mem.Allocator,
+    comptime T: type,
+    options: ArgumentParser.InitOptions,
+    init: std.process.Init,
+) !ParseIntoResult(T)
+```
+
+Convenience wrapper — same as `parseInto(allocator, T, options, null, init)`. Avoids the `null` parameter.
+
+**Example:**
+```zig
+// These are equivalent:
+var result = try args.parseProcessInto(allocator, Config, .{ .name = "myapp" }, init);
+var result = try args.parseInto(allocator, Config, .{ .name = "myapp" }, null, init);
+```
+
 ## Function Aliases
 
 For convenience, the library provides several aliases:
@@ -1324,6 +1346,7 @@ For convenience, the library provides several aliases:
 | Alias | Original Function | Description |
 |-------|------------------|-------------|
 | `derive` | `parseInto` | Parse args directly into a struct |
+| `deriveProcess` | `parseProcessInto` | Shorthand for process args parsing |
 | `configure` | `initConfig` | Set global configuration |
 | `version` | `getLibraryVersion` | Get library version string |
 
@@ -1332,6 +1355,10 @@ For convenience, the library provides several aliases:
 // These are equivalent:
 var parsed = try args.parseInto(allocator, Config, options, null, init);
 var parsed = try args.derive(allocator, Config, options, null, init);
+
+// These are equivalent:
+var parsed = try args.parseProcessInto(allocator, Config, options, init);
+var parsed = try args.deriveProcess(allocator, Config, options, init);
 
 // These are equivalent:
 args.initConfig(.{ .use_colors = false });
@@ -1366,6 +1393,58 @@ Creates a minimal parser (no colors, no update check).
 ```zig
 var parser = try args.createMinimalParser(allocator, "myapp");
 defer parser.deinit();
+```
+
+### `quickParse`
+
+```zig
+pub fn quickParse(comptime T: type, options: ArgumentParser.InitOptions, init: std.process.Init) !ParseIntoResult(T)
+```
+
+One-shot parse using the global allocator. Convenience for simple CLIs where you don't need to manage allocator lifetime.
+
+**Example:**
+```zig
+const Config = struct { verbose: bool, output: ?[]const u8 };
+var result = try args.quickParse(Config, .{ .name = "myapp" }, init);
+defer result.deinit();
+```
+
+### `resetConfig`
+
+```zig
+pub fn resetConfig() void
+```
+
+Resets global configuration back to default values. Useful in tests to avoid state leakage between test cases.
+
+**Example:**
+```zig
+args.initConfig(.{ .use_colors = false });
+defer args.resetConfig(); // Restore defaults after test
+```
+
+### `enableUpdateCheck`
+
+```zig
+pub fn enableUpdateCheck() void
+```
+
+Re-enables the update checker after it has been disabled. The update checker is enabled by default.
+
+### `getLibraryVersion`
+
+```zig
+pub fn getLibraryVersion() []const u8
+```
+
+Returns the library version string. Also available via the `version` alias.
+
+**Example:**
+```zig
+std.debug.print("args.zig version: {s}\n", .{args.getLibraryVersion()});
+// or
+std.debug.print("args.zig version: {s}\n", .{args.version()});
 ```
 
 ### `deriveOptions`

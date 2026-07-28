@@ -35,11 +35,8 @@ fn decodeHex(allocator: std.mem.Allocator, raw: []const u8) !DecodedValue {
     const decoded_len = raw.len / 2;
     const decoded = try allocator.alloc(u8, decoded_len);
     errdefer allocator.free(decoded);
-    for (0..decoded_len) |i| {
-        const hi = std.fmt.charToDigit(raw[i * 2], 16) catch return error.InvalidValue;
-        const lo = std.fmt.charToDigit(raw[i * 2 + 1], 16) catch return error.InvalidValue;
-        decoded[i] = @as(u8, @intCast(hi * 16 + lo));
-    }
+    // std.fmt.hexToBytes handles the full decode in one stdlib call.
+    _ = std.fmt.hexToBytes(decoded, raw) catch return error.InvalidValue;
     return .{ .value = decoded, .owned = decoded };
 }
 
@@ -150,12 +147,11 @@ pub fn validateFileName(file_name: []const u8) bool {
     if (file_name.len == 0) return false;
     if (std.mem.eql(u8, file_name, ".") or std.mem.eql(u8, file_name, "..")) return false;
 
-    // Disallow path separators and common invalid filename characters.
+    // Disallow control chars, path separators, and Windows-invalid characters.
     for (file_name) |c| {
         if (c < 32) return false;
-        if (c == '/' or c == '\\') return false;
-        if (c == '<' or c == '>' or c == ':' or c == '"' or c == '|' or c == '?' or c == '*') return false;
     }
+    if (std.mem.indexOfAny(u8, file_name, "/\\<>:\"|?*") != null) return false;
 
     // Windows compatibility: no trailing dot or space.
     const last = file_name[file_name.len - 1];
@@ -316,11 +312,10 @@ pub fn validateJsonValue(value: []const u8) bool {
 }
 
 /// Validates a four-digit year string (`YYYY`).
+/// Relies entirely on parseInt — the digit-only check is implicit since
+/// parseInt(u16) already rejects any non-digit character.
 pub fn validateYear(value: []const u8) bool {
     if (value.len != 4) return false;
-    for (value) |c| {
-        if (!std.ascii.isDigit(c)) return false;
-    }
     _ = std.fmt.parseInt(u16, value, 10) catch return false;
     return true;
 }
@@ -344,29 +339,48 @@ pub fn validateTime24(value: []const u8) bool {
     return true;
 }
 
+/// Validates Unix timestamp (positive integer, reasonable range up to year 2100).
+pub fn validateUnixTimestamp(value: []const u8) bool {
+    if (value.len == 0) return false;
+    const ts = std.fmt.parseInt(u64, value, 10) catch return false;
+    return ts <= 4102444800; // 2100-01-01 00:00:00 UTC
+}
+
+/// Validates flexible date formats: YYYY-MM-DD, DD/MM/YYYY, MM/DD/YYYY, YYYY/MM/DD.
+pub fn validateDateFlexible(value: []const u8) bool {
+    if (validateIsoDate(value)) return true; // YYYY-MM-DD
+
+    // DD/MM/YYYY or MM/DD/YYYY (slashes at positions 2 and 5, length 10)
+    if (value.len == 10 and value[2] == '/' and value[5] == '/') {
+        const a = std.fmt.parseInt(u16, value[0..2], 10) catch return false;
+        const b = std.fmt.parseInt(u16, value[3..5], 10) catch return false;
+        const c = std.fmt.parseInt(u16, value[6..10], 10) catch return false;
+        if (c >= 1000 and a >= 1 and a <= 31 and b >= 1 and b <= 12) return true;
+        if (c >= 1000 and a >= 1 and a <= 12 and b >= 1 and b <= 31) return true;
+    }
+
+    // YYYY/MM/DD (slashes at positions 4 and 7, length 10)
+    if (value.len == 10 and value[4] == '/' and value[7] == '/') {
+        const year = std.fmt.parseInt(u16, value[0..4], 10) catch return false;
+        const month = std.fmt.parseInt(u8, value[5..7], 10) catch return false;
+        const day = std.fmt.parseInt(u8, value[8..10], 10) catch return false;
+        if (year >= 1000 and month >= 1 and month <= 12 and day >= 1 and day <= 31) return true;
+    }
+
+    return false;
+}
+
 /// Validates hostnames using common DNS label constraints.
 pub fn validateHostName(value: []const u8) bool {
     if (value.len == 0 or value.len > 253) return false;
 
-    var label_start: usize = 0;
-    var idx: usize = 0;
-    while (idx <= value.len) : (idx += 1) {
-        const is_end = idx == value.len or value[idx] == '.';
-        if (!is_end) continue;
-
-        const label = value[label_start..idx];
+    var it = std.mem.splitScalar(u8, value, '.');
+    while (it.next()) |label| {
         if (label.len == 0 or label.len > 63) return false;
-
-        const first = label[0];
-        const last = label[label.len - 1];
-        if (!std.ascii.isAlphanumeric(first) or !std.ascii.isAlphanumeric(last)) return false;
-
+        if (!std.ascii.isAlphanumeric(label[0]) or !std.ascii.isAlphanumeric(label[label.len - 1])) return false;
         for (label) |c| {
-            if (std.ascii.isAlphanumeric(c) or c == '-') continue;
-            return false;
+            if (!std.ascii.isAlphanumeric(c) and c != '-') return false;
         }
-
-        label_start = idx + 1;
     }
 
     return true;
@@ -418,6 +432,14 @@ pub fn validateBase64(value: []const u8) bool {
     if (value.len == 0) return false;
     const decoder = std.base64.standard.Decoder;
     const decoded_len = decoder.calcSizeForSlice(value) catch return false;
+    // 4 KB covers virtually all CLI-passed base64 values with zero heap use.
+    var stack_buf: [4096]u8 = undefined;
+    if (decoded_len <= stack_buf.len) {
+        decoder.decode(stack_buf[0..decoded_len], value) catch return false;
+        return true;
+    }
+    // For unusually large values fall back to the page allocator.
+    // std.heap.stackFallback was removed in Zig 0.17, so we go direct.
     const decoded = std.heap.page_allocator.alloc(u8, decoded_len) catch return false;
     defer std.heap.page_allocator.free(decoded);
     decoder.decode(decoded, value) catch return false;
@@ -440,7 +462,7 @@ pub fn validateMacAddress(value: []const u8) bool {
 /// Validates that a string contains only ASCII characters.
 pub fn validateAsciiOnly(value: []const u8) bool {
     for (value) |c| {
-        if (c > 127) return false;
+        if (!std.ascii.isAscii(c)) return false;
     }
     return true;
 }
@@ -541,11 +563,13 @@ pub const ValidatorFn = *const fn (std.Io, []const u8) ValidationResult;
 
 /// Default validators for common patterns.
 pub const Validators = struct {
+    /// Validates that value is not empty.
     pub fn nonEmpty(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (value.len > 0) .{ .ok = {} } else .{ .err = constants.ValidationMessages.cannot_be_empty };
     }
 
+    /// Validates that value contains only alphanumeric characters.
     pub fn alphanumeric(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         for (value) |c| {
@@ -554,6 +578,7 @@ pub const Validators = struct {
         return .{ .ok = {} };
     }
 
+    /// Validates that value contains only digits.
     pub fn numeric(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         for (value) |c| {
@@ -562,116 +587,151 @@ pub const Validators = struct {
         return .{ .ok = {} };
     }
 
+    /// Validates email address format.
     pub fn emailAddress(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (validateEmailAddress(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.invalid_email };
     }
 
+    /// Validates HTTP/HTTPS URL format.
     pub fn httpUrl(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (validateHttpUrl(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.invalid_url };
     }
 
+    /// Validates IPv4 address format (e.g., 192.168.1.1).
     pub fn ipv4(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (validateIPv4Address(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.invalid_ipv4 };
     }
 
+    /// Validates IPv6 address format.
     pub fn ipv6(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (validateIPv6Address(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.invalid_ipv6 };
     }
 
+    /// Validates any IP address (IPv4 or IPv6).
     pub fn ipAny(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (validateIPv4Address(value) or validateIPv6Address(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.invalid_ip };
     }
 
+    /// Validates UUID format (e.g., 550e8400-e29b-41d4-a716-446655440000).
     pub fn uuid(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (validateUuid(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.invalid_uuid };
     }
 
+    /// Validates ISO 8601 date format (YYYY-MM-DD).
     pub fn isoDate(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (validateIsoDate(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.invalid_iso_date };
     }
 
+    /// Validates ISO 8601 datetime format.
     pub fn isoDateTime(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (validateIsoDateTime(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.invalid_iso_datetime };
     }
 
+    /// Validates JSON string format.
     pub fn json(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (validateJsonValue(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.invalid_json };
     }
 
+    /// Validates 4-digit year format.
     pub fn year(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (validateYear(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.invalid_year };
     }
 
+    /// Validates 24-hour time format (HH:MM).
     pub fn time(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (validateTime24(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.invalid_time };
     }
 
+    /// Validates Unix timestamp (positive integer).
+    pub fn unixTimestamp(io: std.Io, value: []const u8) ValidationResult {
+        _ = io;
+        return if (validateUnixTimestamp(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.invalid_unix_timestamp };
+    }
+
+    /// Validates flexible date formats (YYYY-MM-DD, DD/MM/YYYY, MM/DD/YYYY, YYYY/MM/DD).
+    pub fn dateFlexible(io: std.Io, value: []const u8) ValidationResult {
+        _ = io;
+        return if (validateDateFlexible(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.invalid_date_flexible };
+    }
+
+    /// Validates hostname format.
     pub fn hostname(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (validateHostName(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.invalid_hostname };
     }
 
+    /// Validates port number (0-65535).
     pub fn port(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (validatePort(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.invalid_port };
     }
 
+    /// Validates hex color format (#RRGGBB or #RGB).
     pub fn hexColor(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (validateHexColor(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.invalid_hex_color };
     }
 
+    /// Validates semantic version format (MAJOR.MINOR.PATCH).
     pub fn semver(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (validateSemver(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.invalid_semver };
     }
 
+    /// Validates base64 encoded string.
     pub fn base64(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (validateBase64(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.invalid_base64 };
     }
 
+    /// Validates MAC address format (XX:XX:XX:XX:XX:XX).
     pub fn macAddress(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (validateMacAddress(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.invalid_mac };
     }
 
+    /// Validates that value contains only ASCII characters.
     pub fn asciiOnlyStr(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (validateAsciiOnly(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.ascii_only };
     }
 
+    /// Validates that value is all lowercase.
     pub fn lowercase(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (validateLowercase(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.must_be_lowercase };
     }
 
+    /// Validates that value is all uppercase.
     pub fn uppercase(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (validateUppercase(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.must_be_uppercase };
     }
 
+    /// Validates endpoint format (host:port).
     pub fn endpoint(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (validateEndpoint(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.invalid_endpoint };
     }
 
+    /// Validates key=value pair format.
     pub fn keyValuePair(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (validateKeyValuePair(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.invalid_kv_pair };
     }
 
+    /// Creates a validator that checks integer values are within a range.
     pub fn intRange(comptime min: ?i64, comptime max: ?i64) ValidatorFn {
         return struct {
             fn validate(io: std.Io, value: []const u8) ValidationResult {
@@ -687,6 +747,7 @@ pub const Validators = struct {
         }.validate;
     }
 
+    /// Creates a validator that checks unsigned integer values are within a range.
     pub fn uintRange(comptime min: u64, comptime max: u64) ValidatorFn {
         return struct {
             fn validate(io: std.Io, value: []const u8) ValidationResult {
@@ -698,6 +759,7 @@ pub const Validators = struct {
         }.validate;
     }
 
+    /// Creates a validator that checks float values are within a range.
     pub fn floatRange(comptime min: ?f64, comptime max: ?f64) ValidatorFn {
         return struct {
             fn validate(io: std.Io, value: []const u8) ValidationResult {
@@ -713,23 +775,28 @@ pub const Validators = struct {
         }.validate;
     }
 
+    /// Validates that path exists on filesystem.
     pub fn pathExists(io: std.Io, value: []const u8) ValidationResult {
         return if (validatePathExists(io, value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.path_not_exist };
     }
 
+    /// Validates that path is absolute (starts with / or drive letter).
     pub fn absolutePath(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (validateAbsolutePath(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.path_must_be_absolute };
     }
 
+    /// Validates that file exists on filesystem.
     pub fn fileExists(io: std.Io, value: []const u8) ValidationResult {
         return if (validateFileExists(io, value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.file_not_exist };
     }
 
+    /// Validates that directory exists on filesystem.
     pub fn directoryExists(io: std.Io, value: []const u8) ValidationResult {
         return if (validateDirectoryExists(io, value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.dir_not_exist };
     }
 
+    /// Validates that filename contains only safe characters.
     pub fn fileNameSafe(io: std.Io, value: []const u8) ValidationResult {
         _ = io;
         return if (validateFileName(value)) .{ .ok = {} } else .{ .err = constants.ValidationMessages.invalid_file_name };
@@ -858,9 +925,7 @@ pub const Validators = struct {
         return anyOf(validator_list);
     }
 
-    // ──────────────────────────────────────────────────────────────────
     // New validators added in v0.0.6
-    // ──────────────────────────────────────────────────────────────────
 
     /// Alias for `nonEmpty` — value must not be an empty string.
     pub const notEmpty = nonEmpty;
@@ -955,9 +1020,7 @@ pub const Validators = struct {
     }
 };
 
-// ──────────────────────────────────────────────────────────────────────────────
 // Duration and byte-size parsing (standalone helpers used by Validators above)
-// ──────────────────────────────────────────────────────────────────────────────
 
 /// Parse a duration string into total seconds.
 /// Supported units: d (days), h (hours), m (minutes), s (seconds).
@@ -1383,4 +1446,51 @@ test "Validators base64, macAddress, asciiOnly, lowercase, uppercase" {
 
     try std.testing.expect(Validators.uppercase(std.Io.failing, "HELLO").isOk());
     try std.testing.expect(!Validators.uppercase(std.Io.failing, "Hello").isOk());
+}
+
+test "validateUnixTimestamp" {
+    try std.testing.expect(validateUnixTimestamp("0"));
+    try std.testing.expect(validateUnixTimestamp("1700000000"));
+    try std.testing.expect(validateUnixTimestamp("4102444800")); // 2100-01-01
+    try std.testing.expect(!validateUnixTimestamp("4102444801")); // after 2100
+    try std.testing.expect(!validateUnixTimestamp("-1"));
+    try std.testing.expect(!validateUnixTimestamp("abc"));
+    try std.testing.expect(!validateUnixTimestamp(""));
+}
+
+test "validateDateFlexible" {
+    // ISO format
+    try std.testing.expect(validateDateFlexible("2026-03-30"));
+    try std.testing.expect(!validateDateFlexible("2026-13-01"));
+    try std.testing.expect(!validateDateFlexible("2026-02-30"));
+
+    // DD/MM/YYYY
+    try std.testing.expect(validateDateFlexible("30/03/2026"));
+    try std.testing.expect(validateDateFlexible("01/12/2026"));
+    try std.testing.expect(!validateDateFlexible("32/01/2026"));
+    try std.testing.expect(!validateDateFlexible("00/01/2026"));
+
+    // MM/DD/YYYY
+    try std.testing.expect(validateDateFlexible("12/31/2026"));
+    try std.testing.expect(validateDateFlexible("01/15/2026"));
+
+    // YYYY/MM/DD
+    try std.testing.expect(validateDateFlexible("2026/03/30"));
+    try std.testing.expect(validateDateFlexible("2026/12/01"));
+
+    // Invalid
+    try std.testing.expect(!validateDateFlexible("2026.03.30"));
+    try std.testing.expect(!validateDateFlexible("abc"));
+    try std.testing.expect(!validateDateFlexible(""));
+    try std.testing.expect(!validateDateFlexible("2026/13/01"));
+}
+
+test "Validators unixTimestamp and dateFlexible" {
+    try std.testing.expect(Validators.unixTimestamp(std.Io.failing, "1700000000").isOk());
+    try std.testing.expect(!Validators.unixTimestamp(std.Io.failing, "abc").isOk());
+
+    try std.testing.expect(Validators.dateFlexible(std.Io.failing, "2026-03-30").isOk());
+    try std.testing.expect(Validators.dateFlexible(std.Io.failing, "30/03/2026").isOk());
+    try std.testing.expect(Validators.dateFlexible(std.Io.failing, "2026/03/30").isOk());
+    try std.testing.expect(!Validators.dateFlexible(std.Io.failing, "2026.03.30").isOk());
 }

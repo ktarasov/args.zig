@@ -61,9 +61,7 @@ pub const Config = struct {
     app_epilog: ?[]const u8 = null,
     app_author: ?[]const u8 = null,
 
-    // ──────────────────────────────────────────────────────────────
     // Preset constructors
-    // ──────────────────────────────────────────────────────────────
 
     /// Default config — all features enabled, strict mode.
     pub fn default() Config {
@@ -137,9 +135,7 @@ pub const Config = struct {
         };
     }
 
-    // ──────────────────────────────────────────────────────────────
     // Validation — detect inconsistent config combinations
-    // ──────────────────────────────────────────────────────────────
 
     /// Validates the config and returns a list of detected issues.
     /// The caller owns the returned slice; free each item's `message` if needed.
@@ -366,7 +362,7 @@ pub fn initConfigAutoResolve(cfg: Config) void {
                 .@"error" => constants.Defaults.error_prefix,
             };
             const color = switch (w.severity) {
-                .note => theme.info,
+                .note => theme.accent,
                 .warning => theme.warning,
                 .@"error" => theme.error_color,
             };
@@ -420,9 +416,7 @@ pub fn validateConfig(buf: []ConfigWarning) usize {
     return cfg.validate(buf);
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
 // Tests
-// ──────────────────────────────────────────────────────────────────────────────
 
 test "Config.default" {
     const cfg = Config.default();

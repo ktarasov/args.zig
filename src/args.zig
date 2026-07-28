@@ -4,44 +4,78 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
+/// Core type definitions (ParseResult, ParsedValue, ValueType, etc.).
 pub const types = @import("types.zig");
+/// Schema definitions (ArgSpec, CommandSpec, SubcommandSpec).
 pub const schema = @import("schema.zig");
+/// Tokenizer for splitting CLI arguments into tokens.
 pub const tokenizer = @import("tokenizer.zig");
+/// Parser implementation that processes tokens into ParseResult.
 pub const parser = @import("parser.zig");
+/// Built-in validators for common patterns (email, URL, IP, etc.).
 pub const validation = @import("validation.zig");
+/// Error types for parse, validation, and schema errors.
 pub const errors = @import("errors.zig");
+/// Help text generation and formatting.
 pub const help = @import("help.zig");
+/// Shell completion generation for Bash, Zsh, Fish, PowerShell.
 pub const completion = @import("completion.zig");
+/// Configuration options for parser behavior.
 pub const config = @import("config.zig");
+/// Version information for the library.
 pub const version_info = @import("version.zig");
+/// Update checker for checking newer library versions.
 pub const update_checker = @import("update_checker.zig");
+/// Network utilities for HTTP requests.
 pub const network = @import("network.zig");
+/// General utilities (string matching, fuzzy search, etc.).
 pub const utils = @import("utils.zig");
+/// Constants for help formatting, error messages, and defaults.
 pub const constants = @import("constants.zig");
 
 // Re-export commonly used types
+/// Result of parsing CLI arguments. Provides typed access to parsed values.
 pub const ParseResult = types.ParseResult;
+/// Union type representing a parsed value with typed accessors.
 pub const ParsedValue = types.ParsedValue;
+/// Supported value types for arguments (string, int, float, bool, etc.).
 pub const ValueType = types.ValueType;
+/// Argument actions (store, append, count, etc.).
 pub const ArgAction = types.ArgAction;
+/// Decode modes for encoding/decoding values (hex, base64, etc.).
 pub const DecodeMode = types.DecodeMode;
+/// Number of arguments to consume (nargs).
 pub const Nargs = types.Nargs;
-pub const ParsingMode = types.ParsingMode;
+/// Parsing modes (strict, permissive, interspersed, ignore_unknown).
+pub const ParsingMode = config.ParsingMode;
+/// Specification for a single command-line argument.
 pub const ArgSpec = schema.ArgSpec;
+/// Specification for the entire command (name, version, args, subcommands).
 pub const CommandSpec = schema.CommandSpec;
+/// Specification for a subcommand.
 pub const SubcommandSpec = schema.SubcommandSpec;
+/// Group of related arguments for mutual exclusion or requirements.
 pub const ArgumentGroup = schema.ArgumentGroup;
+/// Builder for constructing CommandSpec programmatically.
 pub const SchemaBuilder = schema.SchemaBuilder;
+/// Configuration options for parser behavior.
 pub const Config = config.Config;
+/// Shell type for completion generation.
 pub const Shell = completion.Shell;
+/// Errors that can occur during argument parsing.
 pub const ParseError = errors.ParseError;
+/// Errors that can occur during value validation.
 pub const ValidationError = errors.ValidationError;
+/// Errors that can occur during schema construction.
 pub const SchemaError = errors.SchemaError;
+/// Function type for custom validators.
 pub const ValidatorFn = validation.ValidatorFn;
+/// Built-in validators for common patterns.
 pub const Validators = validation.Validators;
+/// Color theme for help text output.
 pub const ColorTheme = utils.ColorTheme;
 
-// Version information
+/// Current library version string.
 pub const VERSION = version_info.version;
 
 fn pickExtensionValidator(
@@ -968,6 +1002,68 @@ pub const ArgumentParser = struct {
         });
     }
 
+    /// Adds a Unix timestamp option (positive integer, seconds since epoch).
+    pub fn addUnixTimestampOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = "TIMESTAMP",
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        validator: ?validation.ValidatorFn = null,
+        expect: []const []const u8 = &.{},
+    }) !void {
+        const validator_fn = options.validator orelse validation.Validators.unixTimestamp;
+        try self.addValidatedStringOption(name, validator_fn, .{
+            .short = options.short,
+            .help = options.help,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .expect = options.expect,
+        });
+    }
+
+    /// Adds a flexible date option (YYYY-MM-DD, DD/MM/YYYY, MM/DD/YYYY, YYYY/MM/DD).
+    pub fn addDateFlexibleOption(self: *ArgumentParser, name: []const u8, options: struct {
+        short: ?u8 = null,
+        help: ?[]const u8 = null,
+        default: ?[]const u8 = null,
+        required: bool = false,
+        metavar: ?[]const u8 = "DATE",
+        dest: ?[]const u8 = null,
+        env_var: ?[]const u8 = null,
+        hidden: bool = false,
+        aliases: []const []const u8 = &.{},
+        deprecated: ?[]const u8 = null,
+        validator: ?validation.ValidatorFn = null,
+        expect: []const []const u8 = &.{},
+    }) !void {
+        const validator_fn = options.validator orelse validation.Validators.dateFlexible;
+        try self.addValidatedStringOption(name, validator_fn, .{
+            .short = options.short,
+            .help = options.help,
+            .default = options.default,
+            .required = options.required,
+            .metavar = options.metavar,
+            .dest = options.dest,
+            .env_var = options.env_var,
+            .hidden = options.hidden,
+            .aliases = options.aliases,
+            .deprecated = options.deprecated,
+            .expect = options.expect,
+        });
+    }
+
     /// Adds a port option (`1..65535`).
     pub fn addPortOption(self: *ArgumentParser, name: []const u8, options: struct {
         short: ?u8 = null,
@@ -1387,17 +1483,13 @@ pub const ArgumentParser = struct {
     }) !void {
         const resolved_env = options.env_var orelse blk: {
             var buf: [256]u8 = undefined;
-            var i: usize = 0;
-            for (name) |c| {
-                if (i >= buf.len - 1) break;
-                buf[i] = switch (c) {
-                    '-' => '_',
-                    'a'...'z' => std.ascii.toUpper(c),
-                    else => c,
-                };
-                i += 1;
-            }
-            break :blk buf[0..i];
+            // Truncate names longer than buf to avoid overflow.
+            const src = if (name.len < buf.len) name else name[0..buf.len];
+            @memcpy(buf[0..src.len], src);
+            // Replace hyphens with underscores, then uppercase the whole slice.
+            std.mem.replaceScalar(u8, buf[0..src.len], '-', '_');
+            _ = std.ascii.upperString(buf[0..src.len], buf[0..src.len]);
+            break :blk buf[0..src.len];
         };
         try self.addOption(name, .{
             .short = options.short,
@@ -1758,6 +1850,69 @@ pub const ArgumentParser = struct {
     /// Registers a subcommand.
     pub fn addSubcommand(self: *ArgumentParser, spec: SubcommandSpec) !void {
         try self.subcommands.append(self.allocator, spec);
+    }
+
+    /// Returns a read-only slice of every registered `ArgSpec`.
+    /// The returned pointers remain valid until the parser is deinitialised
+    /// or the argument list is mutated.
+    pub fn getAllArgs(self: *const ArgumentParser) []const ArgSpec {
+        return self.args.items;
+    }
+
+    /// Returns a read-only slice of every registered `SubcommandSpec`.
+    pub fn getAllSubcommands(self: *const ArgumentParser) []const SubcommandSpec {
+        return self.subcommands.items;
+    }
+
+    /// Returns a read-only slice of every registered `ArgumentGroup`.
+    pub fn getAllGroups(self: *const ArgumentParser) []const ArgumentGroup {
+        return self.groups.items;
+    }
+
+    /// Returns the mutual-exclusion groups (each group is a slice of arg names).
+    pub fn getAllMutualExclusions(self: *const ArgumentParser) []const []const []const u8 {
+        return self.mutual_exclusions.items;
+    }
+
+    /// Builds and returns the full `CommandSpec` snapshot.
+    /// This is the same object produced by `buildSpec` but available as a
+    /// convenience for callers who only need the snapshot without further
+    /// mutation.
+    pub fn exportSpec(self: *ArgumentParser) CommandSpec {
+        return self.buildSpec();
+    }
+
+    /// Looks up a single `ArgSpec` by name (or long flag / destination).
+    /// Returns `null` if no argument matches.
+    pub fn getArgSpec(self: *const ArgumentParser, name: []const u8) ?ArgSpec {
+        for (self.args.items) |arg| {
+            if (utils.eql(arg.name, name)) return arg;
+            if (arg.long) |long| {
+                if (utils.eql(long, name)) return arg;
+            }
+            if (arg.dest) |dest| {
+                if (utils.eql(dest, name)) return arg;
+            }
+            for (arg.aliases) |alias| {
+                if (utils.eql(alias, name)) return arg;
+            }
+        }
+        return null;
+    }
+
+    /// Returns the number of registered arguments (including hidden ones).
+    pub fn totalArgCount(self: *const ArgumentParser) usize {
+        return self.args.items.len;
+    }
+
+    /// Returns the number of registered subcommands.
+    pub fn totalSubcommandCount(self: *const ArgumentParser) usize {
+        return self.subcommands.items.len;
+    }
+
+    /// Returns the number of registered argument groups.
+    pub fn totalGroupCount(self: *const ArgumentParser) usize {
+        return self.groups.items.len;
     }
 
     /// Builds the internal command specification.
@@ -2438,6 +2593,8 @@ pub fn parse(
 /// defer result.deinit();
 /// std.debug.print("Verbose: {}\n", .{result.options.verbose});
 /// ```
+///
+/// For a shorter syntax when parsing process args, see `parseProcessInto`.
 pub fn parseInto(
     allocator: std.mem.Allocator,
     comptime T: type,
@@ -2461,67 +2618,107 @@ pub fn parseInto(
         return error.MissingProcessInit;
 
     var opts: T = undefined;
-    inline for (@typeInfo(T).@"struct".fields) |field| {
+    // Use a comptime helper to iterate struct fields compatibly across
+    // Zig 0.16 (builtin.Type.Struct has .fields[]) and
+    // Zig 0.17 (lang.Type.Struct has .field_names[] / .field_types[]).
+    const struct_info = @typeInfo(T).@"struct";
+    const field_count = comptime if (@hasField(@TypeOf(struct_info), "fields"))
+        struct_info.fields.len
+    else
+        struct_info.field_names.len;
+
+    comptime var fi: usize = 0;
+    inline while (fi < field_count) : (fi += 1) {
+        const field_name: [:0]const u8 = if (@hasField(@TypeOf(struct_info), "fields"))
+            struct_info.fields[fi].name
+        else
+            struct_info.field_names[fi];
+
+        const FT: type = if (@hasField(@TypeOf(struct_info), "fields"))
+            struct_info.fields[fi].type
+        else
+            struct_info.field_types[fi];
+
+        const InnerType = if (@typeInfo(FT) == .optional) @typeInfo(FT).optional.child else FT;
+
         const kebab_name = comptime blk: {
-            var buf: [field.name.len]u8 = undefined;
-            for (field.name, 0..) |c, i| {
-                buf[i] = if (c == '_') '-' else c;
+            var buf: [field_name.len]u8 = undefined;
+            for (field_name, 0..) |c, j| {
+                buf[j] = if (c == '_') '-' else c;
             }
             const final_buf = buf;
             break :blk final_buf;
         };
 
         const val_opt = result.get(&kebab_name);
-        const FT = field.type;
-        const InnerType = if (@typeInfo(FT) == .optional) @typeInfo(FT).optional.child else FT;
 
         if (FT == bool) {
-            @field(opts, field.name) = if (val_opt) |v| (v.asBool() orelse false) else false;
+            @field(opts, field_name) = if (val_opt) |v| (v.asBool() orelse false) else false;
         } else if (FT == ?bool) {
-            @field(opts, field.name) = if (val_opt) |v| v.asBool() else null;
+            @field(opts, field_name) = if (val_opt) |v| v.asBool() else null;
         } else if (FT == []const u8) {
-            @field(opts, field.name) = if (val_opt) |v| (v.asString() orelse "") else "";
+            @field(opts, field_name) = if (val_opt) |v| (v.asString() orelse "") else "";
         } else if (FT == ?[]const u8) {
-            @field(opts, field.name) = if (val_opt) |v| v.asString() else null;
+            @field(opts, field_name) = if (val_opt) |v| v.asString() else null;
         } else if (FT == i32) {
-            @field(opts, field.name) = if (val_opt) |v| @as(i32, @intCast(v.asInt() orelse 0)) else 0;
+            @field(opts, field_name) = if (val_opt) |v| @as(i32, @intCast(v.asInt() orelse 0)) else 0;
         } else if (FT == ?i32) {
-            @field(opts, field.name) = if (val_opt) |v| @as(?i32, @intCast(v.asInt())) else null;
+            @field(opts, field_name) = if (val_opt) |v| @as(?i32, @intCast(v.asInt())) else null;
         } else if (FT == i64) {
-            @field(opts, field.name) = if (val_opt) |v| (v.asInt() orelse 0) else 0;
+            @field(opts, field_name) = if (val_opt) |v| (v.asInt() orelse 0) else 0;
         } else if (FT == ?i64) {
-            @field(opts, field.name) = if (val_opt) |v| v.asInt() else null;
+            @field(opts, field_name) = if (val_opt) |v| v.asInt() else null;
         } else if (FT == u32) {
-            @field(opts, field.name) = if (val_opt) |v| @as(u32, @intCast(v.asUint() orelse 0)) else 0;
+            @field(opts, field_name) = if (val_opt) |v| @as(u32, @intCast(v.asUint() orelse 0)) else 0;
         } else if (FT == ?u32) {
-            @field(opts, field.name) = if (val_opt) |v| @as(?u32, @intCast(v.asUint())) else null;
+            @field(opts, field_name) = if (val_opt) |v| @as(?u32, @intCast(v.asUint())) else null;
         } else if (FT == u64) {
-            @field(opts, field.name) = if (val_opt) |v| (v.asUint() orelse 0) else 0;
+            @field(opts, field_name) = if (val_opt) |v| (v.asUint() orelse 0) else 0;
         } else if (FT == ?u64) {
-            @field(opts, field.name) = if (val_opt) |v| v.asUint() else null;
+            @field(opts, field_name) = if (val_opt) |v| v.asUint() else null;
         } else if (FT == f32) {
-            @field(opts, field.name) = if (val_opt) |v| @as(f32, @floatCast(v.asFloat() orelse 0.0)) else 0.0;
+            @field(opts, field_name) = if (val_opt) |v| @as(f32, @floatCast(v.asFloat() orelse 0.0)) else 0.0;
         } else if (FT == ?f32) {
-            @field(opts, field.name) = if (val_opt) |v| @as(?f32, @floatCast(v.asFloat())) else null;
+            @field(opts, field_name) = if (val_opt) |v| @as(?f32, @floatCast(v.asFloat())) else null;
         } else if (FT == f64) {
-            @field(opts, field.name) = if (val_opt) |v| (v.asFloat() orelse 0.0) else 0.0;
+            @field(opts, field_name) = if (val_opt) |v| (v.asFloat() orelse 0.0) else 0.0;
         } else if (FT == ?f64) {
-            @field(opts, field.name) = if (val_opt) |v| v.asFloat() else null;
+            @field(opts, field_name) = if (val_opt) |v| v.asFloat() else null;
         } else if (@typeInfo(FT) == .@"enum") {
             const enum_info = @typeInfo(FT).@"enum";
             if (val_opt) |v| {
                 const str = v.asString() orelse return error.InvalidValue;
-                inline for (enum_info.fields) |ef| {
-                    if (std.mem.eql(u8, ef.name, str)) {
-                        @field(opts, field.name) = @field(InnerType, ef.name);
+                const field_count_e = comptime if (@hasField(@TypeOf(enum_info), "field_names"))
+                    enum_info.field_names.len
+                else
+                    enum_info.fields.len;
+                comptime var ei: usize = 0;
+                inline while (ei < field_count_e) : (ei += 1) {
+                    const ef_name: [:0]const u8 = if (@hasField(@TypeOf(enum_info), "field_names"))
+                        enum_info.field_names[ei]
+                    else
+                        enum_info.fields[ei].name;
+                    if (std.mem.eql(u8, ef_name, str)) {
+                        @field(opts, field_name) = @field(InnerType, ef_name);
                         break;
                     }
                 } else return error.InvalidValue;
             } else {
-                const default_str = if (enum_info.fields.len > 0) enum_info.fields[0].name else "";
-                inline for (enum_info.fields) |ef| {
-                    if (std.mem.eql(u8, ef.name, default_str)) {
-                        @field(opts, field.name) = @field(InnerType, ef.name);
+                const first_name: [:0]const u8 = if (@hasField(@TypeOf(enum_info), "field_names"))
+                    if (enum_info.field_names.len > 0) enum_info.field_names[0] else ""
+                else if (enum_info.fields.len > 0) enum_info.fields[0].name else "";
+                const field_count_e = comptime if (@hasField(@TypeOf(enum_info), "field_names"))
+                    enum_info.field_names.len
+                else
+                    enum_info.fields.len;
+                comptime var ei: usize = 0;
+                inline while (ei < field_count_e) : (ei += 1) {
+                    const ef_name: [:0]const u8 = if (@hasField(@TypeOf(enum_info), "field_names"))
+                        enum_info.field_names[ei]
+                    else
+                        enum_info.fields[ei].name;
+                    if (std.mem.eql(u8, ef_name, first_name)) {
+                        @field(opts, field_name) = @field(InnerType, ef_name);
                         break;
                     }
                 }
@@ -2531,14 +2728,23 @@ pub fn parseInto(
             const enum_info = @typeInfo(InnerEnum).@"enum";
             if (val_opt) |v| {
                 const str = v.asString() orelse return error.InvalidValue;
-                inline for (enum_info.fields) |ef| {
-                    if (std.mem.eql(u8, ef.name, str)) {
-                        @field(opts, field.name) = @field(InnerEnum, ef.name);
+                const field_count_e = comptime if (@hasField(@TypeOf(enum_info), "field_names"))
+                    enum_info.field_names.len
+                else
+                    enum_info.fields.len;
+                comptime var ei: usize = 0;
+                inline while (ei < field_count_e) : (ei += 1) {
+                    const ef_name: [:0]const u8 = if (@hasField(@TypeOf(enum_info), "field_names"))
+                        enum_info.field_names[ei]
+                    else
+                        enum_info.fields[ei].name;
+                    if (std.mem.eql(u8, ef_name, str)) {
+                        @field(opts, field_name) = @field(InnerEnum, ef_name);
                         break;
                     }
                 } else return error.InvalidValue;
             } else {
-                @field(opts, field.name) = null;
+                @field(opts, field_name) = null;
             }
         }
     }
@@ -2587,6 +2793,20 @@ pub fn getLibraryVersion() []const u8 {
 /// Alias for `parseInto`. Parses arguments directly into a struct type.
 pub const derive = parseInto;
 
+/// Convenience: parse process args into a struct type.
+/// Usage: var parsed = try args.parseProcessInto(allocator, Config, .{ .name = "myapp" }, init);
+pub fn parseProcessInto(
+    allocator: std.mem.Allocator,
+    comptime T: type,
+    options: ArgumentParser.InitOptions,
+    init: std.process.Init,
+) !ParseIntoResult(T) {
+    return parseInto(allocator, T, options, null, init);
+}
+
+/// Alias for `parseProcessInto`.
+pub const deriveProcess = parseProcessInto;
+
 /// Alias for `initConfig`. Sets global configuration.
 pub const configure = initConfig;
 
@@ -2597,6 +2817,7 @@ pub const version = getLibraryVersion;
 /// This is a re-export of `schema.deriveOptions` for convenience.
 pub const deriveOptions = schema.deriveOptions;
 
+/// Options for the interactive select-or-all prompt.
 pub const PromptSelectOrAllOptions = struct {
     select_key: []const u8 = constants.Defaults.select_key,
     all_key: []const u8 = constants.Defaults.all_key,
@@ -2611,8 +2832,11 @@ pub const PromptSelectOrAllOptions = struct {
     max_attempts: usize = 3,
 };
 
+/// Result of a select-or-all prompt: either "all" or a specific choice.
 pub const PromptSelectOrAllDecision = union(enum) {
+    /// User selected "all" option.
     all: void,
+    /// User selected a specific choice.
     selected: []const u8,
 };
 
@@ -2692,17 +2916,22 @@ pub fn deinitCsvList(allocator: std.mem.Allocator, items: [][]const u8) void {
     allocator.free(items);
 }
 
+/// Resolved include/exclude lists from an interactive prompt.
 pub const IncludeExcludeResolved = struct {
+    /// Items to include.
     include: [][]const u8,
+    /// Items to exclude.
     exclude: [][]const u8,
     allocator: std.mem.Allocator,
 
+    /// Frees the resolved include/exclude lists.
     pub fn deinit(self: *IncludeExcludeResolved) void {
         deinitCsvList(self.allocator, self.include);
         deinitCsvList(self.allocator, self.exclude);
     }
 };
 
+/// Options for strict include/exclude resolution.
 pub const IncludeExcludeStrictOptions = struct {
     include_key: []const u8 = constants.Defaults.include_name,
     exclude_key: []const u8 = constants.Defaults.exclude_name,
@@ -2714,18 +2943,24 @@ pub const IncludeExcludeStrictOptions = struct {
     fail_on_conflicts: bool = true,
 };
 
+/// Result of strict include/exclude resolution.
 pub const IncludeExcludeStrictResolved = struct {
+    /// Whether "all" was selected.
     all: bool,
+    /// Items to include.
     include: [][]const u8,
+    /// Items to exclude.
     exclude: [][]const u8,
     allocator: std.mem.Allocator,
 
+    /// Frees the resolved include/exclude lists.
     pub fn deinit(self: *IncludeExcludeStrictResolved) void {
         deinitCsvList(self.allocator, self.include);
         deinitCsvList(self.allocator, self.exclude);
     }
 };
 
+/// Options for strict select-or-all resolution.
 pub const SelectOrAllStrictOptions = struct {
     select_key: []const u8 = constants.Defaults.select_key,
     all_key: []const u8 = constants.Defaults.all_key,
@@ -2736,11 +2971,15 @@ pub const SelectOrAllStrictOptions = struct {
     require_selection_when_not_all: bool = false,
 };
 
+/// Result of strict select-or-all resolution.
 pub const SelectOrAllStrictResolved = struct {
+    /// Whether "all" was selected.
     all: bool,
+    /// Selected items.
     selected: [][]const u8,
     allocator: std.mem.Allocator,
 
+    /// Frees the resolved selected items.
     pub fn deinit(self: *SelectOrAllStrictResolved) void {
         deinitCsvList(self.allocator, self.selected);
     }
@@ -2799,6 +3038,8 @@ fn normalizeSelectedValue(raw_value: []const u8, options: SelectOrAllStrictOptio
     return error.InvalidChoice;
 }
 
+/// Resolves a select-or-all decision from parsed CLI arguments.
+/// Returns "all" if --all flag is set, otherwise parses --select CSV list.
 pub fn resolveSelectOrAllStrict(
     allocator: std.mem.Allocator,
     parsed: *const ParseResult,
@@ -2844,6 +3085,7 @@ pub fn resolveSelectOrAllStrict(
     };
 }
 
+/// Resolves include/exclude lists from parsed CSV string values.
 pub fn resolveIncludeExclude(
     allocator: std.mem.Allocator,
     parsed: *const ParseResult,
@@ -2860,6 +3102,7 @@ pub fn resolveIncludeExclude(
     };
 }
 
+/// Resolves include/exclude lists with strict validation (choices, deduplication, conflict detection).
 pub fn resolveIncludeExcludeStrict(
     allocator: std.mem.Allocator,
     parsed: *const ParseResult,
@@ -2936,6 +3179,7 @@ fn writePromptMenu(writer: *std.Io.Writer, options: PromptSelectOrAllOptions) !v
     try writer.writeAll(constants.PromptText.enter_prompt);
 }
 
+/// Resolves select-or-all decision with interactive prompt fallback using custom IO.
 pub fn resolveSelectOrAllWithPromptIO(
     parsed: *const ParseResult,
     options: PromptSelectOrAllOptions,
@@ -3019,6 +3263,7 @@ pub fn resolveSelectOrAllWithPromptIO(
     return error.InvalidValue;
 }
 
+/// Resolves select-or-all decision with interactive prompt using stdin/stdout.
 pub fn resolveSelectOrAllWithPrompt(
     parsed: *const ParseResult,
     options: PromptSelectOrAllOptions,
@@ -3280,7 +3525,7 @@ test "disableUpdateCheck and enableUpdateCheck" {
 
 test "getLibraryVersion" {
     const ver = getLibraryVersion();
-    try std.testing.expectEqualStrings("0.0.7", ver);
+    try std.testing.expectEqualStrings("0.0.8", ver);
 }
 
 test "ArgumentParser subcommand" {
@@ -4275,6 +4520,100 @@ test "ArgumentParser conflicts and requirements" {
     try std.testing.expect(result.contains("output"));
 }
 
+test "ArgumentParser getAllArgs export" {
+    const allocator = std.testing.allocator;
+
+    var ap = try ArgumentParser.init(allocator, .{
+        .name = "export-test",
+        .config = Config.minimal(),
+    });
+    defer ap.deinit();
+
+    try ap.addFlag("verbose", .{ .short = 'v', .help = "Enable verbose mode" });
+    try ap.addOption("output", .{ .short = 'o', .help = "Output file" });
+    try ap.addPositional("input", .{ .help = "Input file" });
+
+    const all_args = ap.getAllArgs();
+    try std.testing.expectEqual(@as(usize, 3), all_args.len);
+
+    try std.testing.expectEqualStrings("verbose", all_args[0].name);
+    try std.testing.expect(all_args[0].short == 'v');
+    try std.testing.expect(all_args[0].action == .store_true);
+
+    try std.testing.expectEqualStrings("output", all_args[1].name);
+    try std.testing.expect(all_args[1].short == 'o');
+
+    try std.testing.expectEqualStrings("input", all_args[2].name);
+    try std.testing.expect(all_args[2].positional);
+}
+
+test "ArgumentParser getArgSpec lookup" {
+    const allocator = std.testing.allocator;
+
+    var ap = try ArgumentParser.init(allocator, .{
+        .name = "lookup-test",
+        .config = Config.minimal(),
+    });
+    defer ap.deinit();
+
+    try ap.addFlag("verbose", .{ .short = 'v' });
+    try ap.addOption("output", .{ .short = 'o', .dest = "out_file" });
+
+    // Lookup by name
+    const v = ap.getArgSpec("verbose");
+    try std.testing.expect(v != null);
+    try std.testing.expect(v.?.action == .store_true);
+
+    // Lookup by short flag name is not supported directly (short is a u8)
+    // but lookup by dest works
+    const o = ap.getArgSpec("out_file");
+    try std.testing.expect(o != null);
+    try std.testing.expectEqualStrings("output", o.?.name);
+
+    // Missing argument
+    try std.testing.expect(ap.getArgSpec("nonexistent") == null);
+}
+
+test "ArgumentParser exportSpec returns full snapshot" {
+    const allocator = std.testing.allocator;
+
+    var ap = try ArgumentParser.init(allocator, .{
+        .name = "snapshot-test",
+        .version = "1.0.0",
+        .config = Config.minimal(),
+    });
+    defer ap.deinit();
+
+    try ap.addFlag("verbose", .{});
+    try ap.addSubcommand(.{ .name = "init", .help = "Initialize" });
+
+    const spec = ap.exportSpec();
+    try std.testing.expectEqualStrings("snapshot-test", spec.name);
+    try std.testing.expectEqualStrings("1.0.0", spec.version.?);
+    try std.testing.expectEqual(@as(usize, 1), spec.args.len);
+    try std.testing.expectEqual(@as(usize, 1), spec.subcommands.len);
+    try std.testing.expectEqualStrings("init", spec.subcommands[0].name);
+}
+
+test "ArgumentParser count methods" {
+    const allocator = std.testing.allocator;
+
+    var ap = try ArgumentParser.init(allocator, .{
+        .name = "count-test",
+        .config = Config.minimal(),
+    });
+    defer ap.deinit();
+
+    try ap.addFlag("verbose", .{});
+    try ap.addOption("output", .{});
+    try ap.addArgumentGroup("Network", .{});
+    try ap.addSubcommand(.{ .name = "serve" });
+
+    try std.testing.expectEqual(@as(usize, 2), ap.totalArgCount());
+    try std.testing.expectEqual(@as(usize, 1), ap.totalSubcommandCount());
+    try std.testing.expectEqual(@as(usize, 1), ap.totalGroupCount());
+}
+
 test "ArgumentParser conditional requirements and mutual exclusion" {
     const allocator = std.testing.allocator;
     config.initConfig(Config.testing());
@@ -4365,8 +4704,6 @@ test "ArgumentParser config auto-resolve and warnings" {
     try std.testing.expect(!ap.cfg.exit_on_error);
     try std.testing.expect(!ap.cfg.use_colors);
 }
-
-// ─── New Feature Tests ─────────────────────────────────────────────
 
 test "utils.parseBracketedList parses curly braces" {
     const allocator = std.testing.allocator;

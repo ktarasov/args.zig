@@ -11,6 +11,16 @@ head:
 
 Instead of manually adding options one by one, `args.zig` allows you to define your configuration as a standard Zig struct and parse arguments directly into it using `parseInto` (or its alias `derive`).
 
+> [!TIP]
+> For the simplest syntax when parsing process args, use `parseProcessInto`:
+> ```zig
+> var parsed = try args.parseProcessInto(allocator, Config, .{ .name = "myapp" }, init);
+> ```
+> Or use `parseInto` with `null` for the same result:
+> ```zig
+> var parsed = try args.parseInto(allocator, Config, .{ .name = "myapp" }, null, init);
+> ```
+
 ## Use Cases
 
 This approach is ideal for:
@@ -25,6 +35,9 @@ This approach is ideal for:
 
 The library inspects your struct fields at compile-time and generates the corresponding `ArgSpec` list.
 
+> [!NOTE]
+> Field names are automatically converted to kebab-case (e.g., `dry_run` becomes `--dry-run`). Types are mapped to the appropriate argument type at compile-time.
+
 - **Field Names**: Converted to kebab-case (e.g., `dry_run` becomes `--dry-run`).
 - **Types**: Mapped to argument types:
     - `bool` → Flag (`.action = .store_true`)
@@ -32,7 +45,8 @@ The library inspects your struct fields at compile-time and generates the corres
     - `i32`, `i64` → Integer Option
     - `f32`, `f64` → Float Option
     - `?T` → Optional (not required)
-    - `T` (non-bool) → Required Option
+    - `T` (non-bool, no default) → Required Option
+    - `T = value` (has default) → Optional with default value applied automatically
 
 ## Supported Field Types
 
@@ -41,11 +55,18 @@ The library inspects your struct fields at compile-time and generates the corres
 | `bool` | Flag, defaults to `false` | `--verbose` |
 | `?bool` | Optional flag | `--debug` |
 | `[]const u8` | Required string | `--name value` |
+| `[]const u8 = "default"` | Optional string with default | `--host localhost` |
 | `?[]const u8` | Optional string | `--output file.txt` |
 | `i32`, `i64` | Required integer | `--count 42` |
+| `i32 = 10` | Optional integer with default | `--port 8080` |
 | `?i32`, `?i64` | Optional integer | `--port 8080` |
+| `u32`, `u64` | Required unsigned integer | `--port 8080` |
+| `u32 = 8080` | Optional unsigned integer with default | `--port 8080` |
 | `f32`, `f64` | Required float | `--rate 0.5` |
+| `f64 = 30.0` | Optional float with default | `--timeout 30.0` |
 | `?f64` | Optional float | `--timeout 30.5` |
+| `enum` | Required enum (choices derived) | `--log-level info` |
+| `enum = .info` | Optional enum with default | `--log-level info` |
 
 ## Basic Example
 
@@ -67,8 +88,13 @@ const Config = struct {
     timeout: ?f64,
     port: ?i32,
     
-    // Required options (non-optional)
+    // Required options (no default value)
     count: i32,
+
+    // Optional with defaults (not required, applied automatically)
+    host: []const u8 = "localhost",
+    level: u32 = 8080,
+    rate: f64 = 0.5,
 };
 
 pub fn main(init: std.process.Init) !void {
@@ -77,7 +103,7 @@ pub fn main(init: std.process.Init) !void {
     var parsed = try args.parseInto(allocator, Config, .{
         .name = "myapp",
         .description = "Struct-based parsing demo",
-    }, null);
+    }, null, init);
     defer parsed.deinit();
 
     const cfg = parsed.options;
@@ -85,6 +111,9 @@ pub fn main(init: std.process.Init) !void {
     std.debug.print("Verbose: {}\n", .{cfg.verbose});
     std.debug.print("Dry Run: {}\n", .{cfg.dry_run});
     std.debug.print("Count: {d}\n", .{cfg.count});
+    std.debug.print("Host: {s}\n", .{cfg.host});
+    std.debug.print("Port: {d}\n", .{cfg.level});
+    std.debug.print("Rate: {d}\n", .{cfg.rate});
     
     if (cfg.output) |out| {
         std.debug.print("Output: {s}\n", .{out});
@@ -103,22 +132,29 @@ $ myapp --count 42 --verbose
 Verbose: true
 Dry Run: false
 Count: 42
+Host: localhost
+Port: 8080
+Rate: 0.5
 
-$ myapp --count 10 --output result.txt --dry-run --port 8080
+$ myapp --count 10 --output result.txt --dry-run --port 8080 --host example.com
 Verbose: false
 Dry Run: true
 Count: 10
+Host: example.com
+Port: 8080
+Rate: 0.5
 Output: result.txt
 Port: 8080
 ```
 
 ## Limitations and How to Handle Complex Cases
 
-The `parseInto` approach is designed for simple to moderately complex CLIs. For advanced use cases, you can combine approaches:
+> [!WARNING]
+> The `parseInto` approach is designed for simple to moderately complex CLIs. For advanced use cases (multi-value options, choices, subcommands), combine with the `ArgumentParser` API.
 
-### Limitation 1: No Multi-Value Options
+### Limitation 1: No Multi-Value Options (Append/FIFO)
 
-Struct-based parsing doesn't support repeatable options (like `-I path1 -I path2`). For this, use the traditional API:
+Struct-based parsing doesn't support repeatable options (like `-I path1 -I path2`). For this, use the traditional API with `addAppend`, which stores values in FIFO order (first-in, first-out):
 
 ```zig
 // Instead of parseInto, use ArgumentParser directly:
@@ -130,9 +166,12 @@ try parser.addAppend("include", .{ .short = 'I', .help = "Include paths" });
 var result = try parser.parseProcess(init);
 defer result.deinit();
 
-// Access multiple values
-const includes = result.getList("include"); // Returns slice of values
+// Access multiple values in FIFO order
+const includes = result.getArray("include"); // Returns slice of values
+// -I foo -I bar -I baz → ["foo", "bar", "baz"]
 ```
+
+Or use the **hybrid approach** to combine struct fields with append options:
 
 ### Limitation 2: No Choices or Validation
 
@@ -163,7 +202,8 @@ try parser.addSubcommand(.{
 
 ## Hybrid Approach: Combining Both Methods
 
-You can use the derived specs as a starting point and add more options manually:
+> [!TIP]
+> You can use the derived specs as a starting point and add more options manually:
 
 ```zig
 const Config = struct {
@@ -204,8 +244,12 @@ For a more concise API, use the `derive` alias:
 
 ```zig
 // These are equivalent:
-var parsed = try args.parseInto(allocator, Config, options, null);
-var parsed = try args.derive(allocator, Config, options, null);
+var parsed = try args.parseInto(allocator, Config, options, null, init);
+var parsed = try args.derive(allocator, Config, options, null, init);
+
+// Or use parseProcessInto / deriveProcess for shorter syntax:
+var parsed = try args.parseProcessInto(allocator, Config, options, init);
+var parsed = try args.deriveProcess(allocator, Config, options, init);
 ```
 
 ## Using Global Configuration
@@ -223,7 +267,7 @@ args.configure(.{
 // parseInto will use these defaults
 var parsed = try args.parseInto(allocator, Config, .{
     .name = "", // Uses app_name from global config
-}, null);
+}, null, init);
 defer parsed.deinit();
 ```
 
@@ -232,7 +276,7 @@ defer parsed.deinit();
 The returned `ParseIntoResult` contains both the typed options and the raw parse result:
 
 ```zig
-var parsed = try args.parseInto(allocator, Config, options, null);
+var parsed = try args.parseInto(allocator, Config, options, null, init);
 defer parsed.deinit();
 
 // Typed access (from struct)
