@@ -3,7 +3,7 @@
 <img  alt="cover" src="https://github.com/user-attachments/assets/6b4390a1-af10-4175-8c8b-c36f3868b398" />
 
 <a href="https://muhammad-fiaz.github.io/args.zig/"><img src="https://img.shields.io/badge/docs-muhammad--fiaz.github.io-blue" alt="Documentation"></a>
-<a href="https://ziglang.org/"><img src="https://img.shields.io/badge/Zig-0.16.0+-orange.svg?logo=zig" alt="Zig Version"></a>
+<a href="https://ziglang.org/"><img src="https://img.shields.io/badge/Zig-0.16%2B%20%7C%200.17%2B-orange.svg?logo=zig" alt="Zig Version"></a>
 <a href="https://github.com/muhammad-fiaz/args.zig"><img src="https://img.shields.io/github/stars/muhammad-fiaz/args.zig" alt="GitHub stars"></a>
 <a href="https://github.com/muhammad-fiaz/args.zig/issues"><img src="https://img.shields.io/github/issues/muhammad-fiaz/args.zig" alt="GitHub issues"></a>
 <a href="https://github.com/muhammad-fiaz/args.zig/pulls"><img src="https://img.shields.io/github/issues-pr/muhammad-fiaz/args.zig" alt="GitHub pull requests"></a>
@@ -102,13 +102,13 @@ A production-grade, high-performance command-line argument parsing library for Z
 
 Install the stable release matching your Zig version:
 
-**Zig 0.17+ (v0.0.8):**
+**Zig 0.16+ / 0.17+ (v0.0.8) — Latest:**
 
 ```bash
 zig fetch --save https://github.com/muhammad-fiaz/args.zig/archive/refs/tags/0.0.8.tar.gz
 ```
 
-**Zig 0.16 (v0.0.7):**
+**Zig 0.16 (v0.0.7) — Previous Stable:**
 
 ```bash
 zig fetch --save https://github.com/muhammad-fiaz/args.zig/archive/refs/tags/0.0.7.tar.gz

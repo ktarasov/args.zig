@@ -21,13 +21,13 @@ head:
 
 Install the stable release matching your Zig version:
 
-**Zig 0.17+ (v0.0.8):**
+**Zig 0.16+ / 0.17+ (v0.0.8) — Latest:**
 
 ```bash
 zig fetch --save https://github.com/muhammad-fiaz/args.zig/archive/refs/tags/0.0.8.tar.gz
 ```
 
-**Zig 0.16 (v0.0.7):**
+**Zig 0.16 (v0.0.7) — Previous Stable:**
 
 ```bash
 zig fetch --save https://github.com/muhammad-fiaz/args.zig/archive/refs/tags/0.0.7.tar.gz
