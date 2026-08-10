@@ -79,7 +79,7 @@ pub fn generateHelpWithConfig(allocator: std.mem.Allocator, spec: CommandSpec, u
         for (spec.args) |arg| {
             if (!arg.positional or arg.hidden) continue;
             try writer.print("    {s}<{s}>{s}", .{ argument, arg.name, reset });
-            const padding = if (arg.name.len + 2 < 20) 20 - arg.name.len - 2 else 2;
+            const padding = if (arg.name.len + 2 < cfg.help_indent) cfg.help_indent - arg.name.len - 2 else 2;
             try writer.splatByteAll(' ', padding);
             if (arg.help) |h| try writer.print("{s}", .{h});
             if (arg.required) try writer.print(" {s}{s}{s}", .{ dim, constants.HelpFormat.required_annotation, reset });
@@ -148,13 +148,13 @@ pub fn generateHelpWithConfig(allocator: std.mem.Allocator, spec: CommandSpec, u
 
         if (spec.add_help) {
             try writer.print("    {s}-h{s}, {s}--help{s}", .{ option, reset, option, reset });
-            try writer.splatByteAll(' ', 12);
+            try writer.splatByteAll(' ', cfg.help_indent - 10);
             try writer.print("{s}\n", .{constants.HelpText.print_help});
         }
 
         if (spec.add_version and spec.version != null) {
             try writer.print("    {s}-V{s}, {s}--version{s}", .{ option, reset, option, reset });
-            try writer.splatByteAll(' ', 9);
+            try writer.splatByteAll(' ', cfg.help_indent - 13);
             try writer.print("{s}\n", .{constants.HelpText.print_version});
         }
     }
