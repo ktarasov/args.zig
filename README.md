@@ -48,9 +48,14 @@ A production-grade, high-performance command-line argument parsing library for Z
 - For **archive/compression** support, check out **[archive.zig](https://github.com/muhammad-fiaz/archive.zig)**.
 - For **compression file format** support, check out **[zigx](https://github.com/muhammad-fiaz/zigx)**.
 - For **file downloading** support, check out **[downloader.zig](https://github.com/muhammad-fiaz/downloader.zig)**.
+- For **update checker/auto-updater** support, check out **[updater.zig](https://github.com/muhammad-fiaz/updater.zig)**.
 - For **numerical computing** support, check out **[num.zig](https://github.com/muhammad-fiaz/num.zig)**.
 - For **logging** support, check out **[logly.zig](https://github.com/muhammad-fiaz/logly.zig)**.
 - For **data validation and serialization** support, check out **[zigantic](https://github.com/muhammad-fiaz/zigantic)**.
+- For **build tooling** support, check out **[buildx.zig](https://github.com/muhammad-fiaz/buildx.zig)**.
+- For **CUDA/GPU computing** support, check out **[cuda.zig](https://github.com/muhammad-fiaz/cuda.zig)**.
+- For **Sqlite** support, check out **[sqlite.zig](https://github.com/muhammad-fiaz/sqlite.zig)**.
+- For **Simplified Build.zig** support, check out **[build.zig](https://github.com/muhammad-fiaz/buildx.zig)**.
 
 ⭐ **If you love `args.zig`, make sure to give it a star!**
 
