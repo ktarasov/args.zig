@@ -16,7 +16,7 @@ This document covers all core types and compile-time version constants in args.z
 The library exposes the following compile-time constants for versioning:
 
 ```zig
-pub const VERSION = "0.0.8";
+pub const VERSION = "0.0.9";
 ```
 
 ## ValueType
@@ -288,8 +288,6 @@ Parser configuration.
 
 ```zig
 pub const Config = struct {
-    check_for_updates: bool = true,
-    show_update_notification: bool = true,
     use_colors: bool = true,
     help_line_width: usize = 80,
     help_indent: usize = 24,

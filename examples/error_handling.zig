@@ -9,7 +9,6 @@ pub fn main(init: std.process.Init) !void {
         .description = "Shows duplicate handling, validation errors, and unknown option suggestions",
         .config = .{
             .exit_on_error = false,
-            .check_for_updates = false,
             .silent_errors = true,
             .suggest_closest = true,
             .suggestion_max_distance = 4,

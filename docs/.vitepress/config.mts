@@ -23,13 +23,9 @@ export default defineConfig({
   base: "/args.zig/",
   lastUpdated: true,
   cleanUrls: true,
-  
+
   sitemap: {
     hostname: SITE_URL,
-  },
-
-  vite: {
-    plugins: [llmstxt()],
   },
 
   head: [
@@ -44,7 +40,7 @@ export default defineConfig({
     ["meta", { name: "language", content: "English" }],
     ["meta", { name: "revisit-after", content: "7 days" }],
     ["meta", { name: "generator", content: "VitePress" }],
-    
+
     // Open Graph / Facebook
     ["meta", { property: "og:type", content: "website" }],
     ["meta", { property: "og:url", content: SITE_URL }],
@@ -148,7 +144,7 @@ gtag('config', '${GA_ID}');`,
     const lastUpdated = pageData.lastUpdated
       ? new Date(pageData.lastUpdated).toISOString()
       : new Date().toISOString();
-    
+
     // Base Graph
     const graph: any[] = [];
 
@@ -208,13 +204,13 @@ gtag('config', '${GA_ID}');`,
           "priceCurrency": "USD"
         },
         "downloadUrl": "https://github.com/muhammad-fiaz/args.zig",
-        "softwareVersion": "0.0.8", 
+        "softwareVersion": "0.0.9",
         "license": "https://opensource.org/licenses/MIT"
       });
     } else {
       const pathParts = pageData.relativePath.split('/');
-      const section = pathParts.length > 1 
-        ? pathParts[0].charAt(0).toUpperCase() + pathParts[0].slice(1) 
+      const section = pathParts.length > 1
+        ? pathParts[0].charAt(0).toUpperCase() + pathParts[0].slice(1)
         : 'Documentation';
 
       Object.assign(primarySchema, {
@@ -243,11 +239,11 @@ gtag('config', '${GA_ID}');`,
     if (!isHome) {
       const pathParts = pageData.relativePath.replace(/\.md$/, '').split('/');
       let currentPath = SITE_URL;
-      
+
       pathParts.forEach((part: string, index: number) => {
         currentPath += `/${part}`;
         const name = part.split('-').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
-        
+
         breadcrumbs.push({
           "@type": "ListItem",
           "position": index + 2,
@@ -272,6 +268,10 @@ gtag('config', '${GA_ID}');`,
     ]);
   },
 
+  vite: {
+    plugins: [llmstxt()],
+  },
+
   themeConfig: {
     logo: "/logo.png",
     siteTitle: "args.zig",
@@ -284,8 +284,8 @@ gtag('config', '${GA_ID}');`,
       {
         text: "Support",
         items: [
-          { text: "💖 Sponsor", link: "https://github.com/sponsors/muhammad-fiaz" },
-          { text: "☕ Donate", link: "https://pay.muhammadfiaz.com" },
+          { text: "Sponsor", link: "https://github.com/sponsors/muhammad-fiaz" },
+          { text: "Donate", link: "https://pay.muhammadfiaz.com" },
         ],
       },
       { text: "GitHub", link: "https://github.com/muhammad-fiaz/args.zig" },
@@ -317,7 +317,6 @@ gtag('config', '${GA_ID}');`,
             { text: "Declarative Structs", link: "/guide/declarative-structs" },
             { text: "Schema Builder", link: "/guide/schema-builder" },
             { text: "Export / Introspection", link: "/guide/export" },
-            { text: "Update Checker", link: "/guide/updates" },
           ],
         },
       ],
@@ -351,7 +350,7 @@ gtag('config', '${GA_ID}');`,
 
     footer: {
       message: "Released under the MIT License.",
-      copyright: "Copyright © 2025-Present Muhammad Fiaz",
+      copyright: "Copyright 2025-Present Muhammad Fiaz",
     },
 
     search: {

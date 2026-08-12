@@ -1,6 +1,6 @@
 ---
 title: Configuration
-description: Configure args.zig parser behavior including colors, help formatting, parsing modes, and update checking.
+description: Configure args.zig parser behavior including colors, help formatting, and parsing modes.
 head:
   - - meta
     - name: keywords
@@ -20,10 +20,6 @@ args.zig provides flexible configuration options to customize parser behavior.
 const args = @import("args");
 
 const Config = struct {
-    // Update checking
-    check_for_updates: bool = true,
-    show_update_notification: bool = true,
-    
     // Display options
     use_colors: bool = true,
     colors: ?args.ColorTheme = null,
@@ -67,13 +63,6 @@ const Config = struct {
 
 
 ## Configuration Options
-
-### Update Checking
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `check_for_updates` | `true` | Check for new versions on GitHub |
-| `show_update_notification` | `true` | Display notification if update available |
 
 ### Display Options
 
@@ -159,7 +148,7 @@ var parser = try args.ArgumentParser.init(allocator, .{
 
 ### Minimal Configuration
 
-No colors, no updates, no exit on error, and silent:
+No colors, no exit on error, and silent:
 
 ```zig
 var parser = try args.ArgumentParser.init(allocator, .{
@@ -192,7 +181,7 @@ var parser = try args.ArgumentParser.init(allocator, .{
 
 ### Testing Configuration
 
-Specifically configured for unit tests. Suppresses errors, disables updates and exit behavior:
+Specifically configured for unit tests. Suppresses errors and disables exit behavior:
 
 ```zig
 var parser = try args.ArgumentParser.init(allocator, .{
@@ -203,7 +192,7 @@ var parser = try args.ArgumentParser.init(allocator, .{
 
 ### CI Configuration
 
-Strict mode, exit on error, spelling suggestions, but disables all color codes (pipe-safe) and update checks:
+Strict mode, exit on error, and spelling suggestions, but disables all color codes (pipe-safe):
 
 ```zig
 var parser = try args.ArgumentParser.init(allocator, .{
@@ -214,7 +203,7 @@ var parser = try args.ArgumentParser.init(allocator, .{
 
 ### Production Configuration
 
-Enforces color themes, automatic update notifications, spelling suggestions, and exit on error:
+Enforces color themes, spelling suggestions, and exit on error:
 
 ```zig
 var parser = try args.ArgumentParser.init(allocator, .{
@@ -230,7 +219,6 @@ var parser = try args.ArgumentParser.init(allocator, .{
     .name = "myapp",
     .config = .{
         .use_colors = true,
-        .check_for_updates = false,
         .show_defaults = true,
         .exit_on_error = false,
     },
@@ -249,7 +237,6 @@ args.initConfig(.{
     .app_description = "My amazing application",
     .app_author = "Your Name",
     .use_colors = true,
-    .check_for_updates = false,
 });
 
 // Parsers automatically inherit these values
@@ -271,32 +258,6 @@ var parsed = try args.parseInto(allocator, Config, .{
 - **Consistent behavior**: All parsers share the same settings
 - **Override when needed**: Per-parser config takes precedence
 
-
-## Disabling Update Checks
-
-### Method 1: Global Disable
-
-```zig
-args.disableUpdateCheck();
-```
-
-### Method 2: Per-Parser Config
-
-```zig
-var parser = try args.ArgumentParser.init(allocator, .{
-    .name = "myapp",
-    .config = .{ .check_for_updates = false },
-});
-```
-
-### Method 3: Minimal Preset
-
-```zig
-var parser = try args.ArgumentParser.init(allocator, .{
-    .name = "myapp",
-    .config = args.Config.minimal(),
-});
-```
 
 ## Parsing Modes
 

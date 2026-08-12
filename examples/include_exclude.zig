@@ -9,7 +9,6 @@ pub fn main(init: std.process.Init) !void {
         .description = "CMD-style include/exclude filters",
         .config = .{
             .exit_on_error = false,
-            .check_for_updates = false,
             .silent_errors = true,
         },
     });

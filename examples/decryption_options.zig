@@ -9,7 +9,6 @@ pub fn main(init: std.process.Init) !void {
         .description = "Demonstrates automatic Base64 decryption/decoding for option values",
         .config = .{
             .exit_on_error = false,
-            .check_for_updates = false,
         },
     });
     defer parser.deinit();

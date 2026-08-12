@@ -24,8 +24,6 @@ pub const ConfigWarning = struct {
 
 /// Global configuration for the argument parser.
 pub const Config = struct {
-    check_for_updates: bool = true,
-    show_update_notification: bool = true,
     use_colors: bool = true,
     colors: ?utils.ColorTheme = null,
     help_line_width: usize = 80,
@@ -68,11 +66,9 @@ pub const Config = struct {
         return .{};
     }
 
-    /// Minimal config — no colors, no updates, no exit on error, silent.
+    /// Minimal config — no colors, no exit on error, silent.
     pub fn minimal() Config {
         return .{
-            .check_for_updates = false,
-            .show_update_notification = false,
             .use_colors = false,
             .show_defaults = false,
             .show_env_vars = false,
@@ -98,38 +94,32 @@ pub const Config = struct {
         };
     }
 
-    /// Testing config — silent, no exit, no updates. Ideal for unit tests.
+    /// Testing config — silent, no exit. Ideal for unit tests.
     pub fn testing() Config {
         return .{
             .exit_on_error = false,
             .silent_errors = true,
-            .check_for_updates = false,
-            .show_update_notification = false,
             .use_colors = false,
             .parsing_mode = .strict,
         };
     }
 
-    /// CI config — strict, no colors (pipe-safe), no update checks.
+    /// CI config — strict, no colors (pipe-safe).
     pub fn ci() Config {
         return .{
             .exit_on_error = true,
             .use_colors = false,
-            .check_for_updates = false,
-            .show_update_notification = false,
             .parsing_mode = .strict,
             .suggest_closest = true,
             .silent_errors = false,
         };
     }
 
-    /// Production config — exit on error, colors, updates, strict.
+    /// Production config — exit on error, colors, strict.
     pub fn production() Config {
         return .{
             .exit_on_error = true,
             .use_colors = true,
-            .check_for_updates = true,
-            .show_update_notification = true,
             .parsing_mode = .strict,
             .suggest_closest = true,
         };
@@ -203,19 +193,7 @@ pub const Config = struct {
             }
         }
 
-        // 6. check_for_updates + silent_errors
-        if (self.check_for_updates and self.silent_errors) {
-            if (count < buf.len) {
-                buf[count] = .{
-                    .field = "check_for_updates",
-                    .message = constants.ConfigWarnings.update_check_silent,
-                    .severity = .note,
-                };
-                count += 1;
-            }
-        }
-
-        // 7. no suggestion candidates at all
+        // 6. no suggestion candidates at all
         if (self.suggest_closest and !self.suggest_builtin_commands and !self.suggest_subcommands) {
             if (count < buf.len) {
                 buf[count] = .{
@@ -267,12 +245,6 @@ pub const Config = struct {
             cfg.use_colors = false;
         }
 
-        // Fix: check_for_updates + silent_errors → disable updates
-        if (cfg.check_for_updates and cfg.silent_errors) {
-            cfg.check_for_updates = false;
-            cfg.show_update_notification = false;
-        }
-
         // Fix: help_indent >= help_line_width → clamp indent
         if (cfg.help_indent >= cfg.help_line_width) {
             cfg.help_indent = cfg.help_line_width / 3;
@@ -289,8 +261,6 @@ pub const Config = struct {
         const defaults = Config{};
 
         // Override fields that differ from their default in `other`
-        if (other.check_for_updates != defaults.check_for_updates) result.check_for_updates = other.check_for_updates;
-        if (other.show_update_notification != defaults.show_update_notification) result.show_update_notification = other.show_update_notification;
         if (other.use_colors != defaults.use_colors) result.use_colors = other.use_colors;
         if (other.colors != null) result.colors = other.colors;
         if (other.help_line_width != defaults.help_line_width) result.help_line_width = other.help_line_width;
@@ -420,14 +390,12 @@ pub fn validateConfig(buf: []ConfigWarning) usize {
 
 test "Config.default" {
     const cfg = Config.default();
-    try std.testing.expect(cfg.check_for_updates);
     try std.testing.expect(cfg.use_colors);
     try std.testing.expect(cfg.exit_on_error);
 }
 
 test "Config.minimal" {
     const cfg = Config.minimal();
-    try std.testing.expect(!cfg.check_for_updates);
     try std.testing.expect(!cfg.use_colors);
     try std.testing.expect(!cfg.exit_on_error);
     try std.testing.expect(cfg.silent_errors);
@@ -443,7 +411,6 @@ test "Config.testing preset" {
     const cfg = Config.testing();
     try std.testing.expect(!cfg.exit_on_error);
     try std.testing.expect(cfg.silent_errors);
-    try std.testing.expect(!cfg.check_for_updates);
     try std.testing.expect(!cfg.use_colors);
 }
 
@@ -451,14 +418,12 @@ test "Config.ci preset" {
     const cfg = Config.ci();
     try std.testing.expect(cfg.exit_on_error);
     try std.testing.expect(!cfg.use_colors);
-    try std.testing.expect(!cfg.check_for_updates);
 }
 
 test "Config.production preset" {
     const cfg = Config.production();
     try std.testing.expect(cfg.exit_on_error);
     try std.testing.expect(cfg.use_colors);
-    try std.testing.expect(cfg.check_for_updates);
 }
 
 test "Config.validate detects permissive+exit_on_error" {
@@ -540,12 +505,11 @@ test "Config.snapshot returns copy" {
 }
 
 test "initConfig and getConfig" {
-    initConfig(.{ .use_colors = false, .check_for_updates = false });
+    initConfig(.{ .use_colors = false });
     defer resetConfig();
 
     const cfg = getConfig();
     try std.testing.expect(!cfg.use_colors);
-    try std.testing.expect(!cfg.check_for_updates);
 }
 
 test "setConfigValue" {

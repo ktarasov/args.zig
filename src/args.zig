@@ -22,12 +22,7 @@ pub const help = @import("help.zig");
 pub const completion = @import("completion.zig");
 /// Configuration options for parser behavior.
 pub const config = @import("config.zig");
-/// Version information for the library.
-pub const version_info = @import("version.zig");
-/// Update checker for checking newer library versions.
-pub const update_checker = @import("update_checker.zig");
-/// Network utilities for HTTP requests.
-pub const network = @import("network.zig");
+
 /// General utilities (string matching, fuzzy search, etc.).
 pub const utils = @import("utils.zig");
 /// Constants for help formatting, error messages, and defaults.
@@ -76,7 +71,7 @@ pub const Validators = validation.Validators;
 pub const ColorTheme = utils.ColorTheme;
 
 /// Current library version string.
-pub const VERSION = version_info.version;
+pub const VERSION = "0.0.9";
 
 fn pickExtensionValidator(
     comptime allowed_extensions: []const []const u8,
@@ -122,7 +117,6 @@ pub const ArgumentParser = struct {
     add_help: bool = true,
     add_version: bool = true,
     cfg: Config,
-    update_thread: ?std.Thread = null,
 
     pub const InitOptions = struct {
         name: []const u8,
@@ -141,11 +135,6 @@ pub const ArgumentParser = struct {
     pub fn init(allocator: std.mem.Allocator, options: InitOptions) !ArgumentParser {
         const cfg = options.config orelse config.getConfig();
 
-        var update_thread: ?std.Thread = null;
-        if (cfg.check_for_updates and !builtin.is_test) {
-            update_thread = update_checker.checkForUpdates(allocator, cfg.show_update_notification, cfg.use_colors);
-        }
-
         return .{
             .allocator = allocator,
             .name = if (options.name.len > 0) options.name else (cfg.app_name orelse constants.Defaults.program_name),
@@ -162,16 +151,11 @@ pub const ArgumentParser = struct {
             .add_help = options.add_help,
             .add_version = options.add_version,
             .cfg = cfg,
-            .update_thread = update_thread,
         };
     }
 
     /// Releases all resources allocated by the parser.
     pub fn deinit(self: *ArgumentParser) void {
-        if (self.update_thread) |thread| {
-            thread.join();
-            self.update_thread = null;
-        }
         self.args.deinit(self.allocator);
         for (self.groups.items) |*g| g.deinit(self.allocator);
         self.groups.deinit(self.allocator);
@@ -2775,16 +2759,6 @@ pub fn resetConfig() void {
     config.resetConfig();
 }
 
-/// Disables global update checking.
-pub fn disableUpdateCheck() void {
-    config.setConfigValue("check_for_updates", false);
-}
-
-/// Enables global update checking.
-pub fn enableUpdateCheck() void {
-    config.setConfigValue("check_for_updates", true);
-}
-
 /// Returns the current library version.
 pub fn getLibraryVersion() []const u8 {
     return VERSION;
@@ -3297,7 +3271,7 @@ pub fn createParser(allocator: std.mem.Allocator, name: []const u8) !ArgumentPar
     return ArgumentParser.init(allocator, .{ .name = name });
 }
 
-/// Creates a minimal parser with no extra features (no colors, no update check).
+/// Creates a minimal parser with no extra features (no colors).
 pub fn createMinimalParser(allocator: std.mem.Allocator, name: []const u8) !ArgumentParser {
     return ArgumentParser.init(allocator, .{ .name = name, .config = Config.minimal() });
 }
@@ -3511,21 +3485,9 @@ test "quick parse function" {
     try std.testing.expect(result.getBool("verbose").?);
 }
 
-test "disableUpdateCheck and enableUpdateCheck" {
-    disableUpdateCheck();
-    const cfg = config.getConfig();
-    try std.testing.expect(!cfg.check_for_updates);
-
-    enableUpdateCheck();
-    const cfg2 = config.getConfig();
-    try std.testing.expect(cfg2.check_for_updates);
-
-    config.resetConfig();
-}
-
 test "getLibraryVersion" {
     const ver = getLibraryVersion();
-    try std.testing.expectEqualStrings("0.0.8", ver);
+    try std.testing.expectEqualStrings("0.0.9", ver);
 }
 
 test "ArgumentParser subcommand" {
@@ -3715,7 +3677,6 @@ test "ArgumentParser addFileOptionWithExtensions inherits parser case sensitivit
     var ap = try ArgumentParser.init(allocator, .{
         .name = "files",
         .config = .{
-            .check_for_updates = false,
             .case_sensitive = false,
             .exit_on_error = false,
             .silent_errors = true,
@@ -3817,7 +3778,6 @@ test "ArgumentParser addFileNameOptionWithExtensions inherits parser case sensit
     var ap = try ArgumentParser.init(allocator, .{
         .name = "files",
         .config = .{
-            .check_for_updates = false,
             .case_sensitive = false,
             .exit_on_error = false,
             .silent_errors = true,
@@ -4473,7 +4433,6 @@ test "createMinimalParser convenience" {
 
     try std.testing.expectEqualStrings("minimal", ap.name);
     try std.testing.expect(!ap.cfg.use_colors);
-    try std.testing.expect(!ap.cfg.check_for_updates);
 }
 
 test "version alias" {
@@ -4482,7 +4441,7 @@ test "version alias" {
 }
 
 test "configure alias" {
-    configure(.{ .use_colors = false, .check_for_updates = false });
+    configure(.{ .use_colors = false });
     defer resetConfig();
 
     const cfg = config.getConfig();
@@ -4687,7 +4646,7 @@ test "ArgumentParser config auto-resolve and warnings" {
         .parsing_mode = .permissive,
         .exit_on_error = true,
         .use_colors = true,
-        .silent_errors = true, // auto-resolve will turn off colors and updates
+        .silent_errors = true, // auto-resolve will turn off colors and silent errors
     };
 
     var ap = try ArgumentParser.init(allocator, .{

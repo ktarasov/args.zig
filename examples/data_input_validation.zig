@@ -9,7 +9,6 @@ pub fn main(init: std.process.Init) !void {
         .description = "Typed input validators for emails, URLs, dates, JSON, and IDs",
         .config = .{
             .exit_on_error = false,
-            .check_for_updates = false,
             .silent_errors = true,
         },
     });

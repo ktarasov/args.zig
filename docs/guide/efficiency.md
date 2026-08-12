@@ -30,7 +30,7 @@ The core parser is designed to minimize runtime allocations:
 
 1. **Pre-computed Maps:** We use optimized HashMaps for option lookup that are initialized once.
 2. **In-place Tokenization:** Command-line arguments are tokenized in-place whenever possible, pointing back to the original argument slice.
-3. **Lazy Execution:** Features like the update checker run in independent threads to ensure they don't block the main application startup.
+3. **Lazy Execution:** Features like shell completions are generated on demand, avoiding unnecessary work at startup.
 
 ## Benchmark Coverage
 

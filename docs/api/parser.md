@@ -1387,7 +1387,7 @@ defer parser.deinit();
 pub fn createMinimalParser(allocator: std.mem.Allocator, name: []const u8) !ArgumentParser
 ```
 
-Creates a minimal parser (no colors, no update check).
+Creates a minimal parser (no colors).
 
 **Example:**
 ```zig
@@ -1423,14 +1423,6 @@ Resets global configuration back to default values. Useful in tests to avoid sta
 args.initConfig(.{ .use_colors = false });
 defer args.resetConfig(); // Restore defaults after test
 ```
-
-### `enableUpdateCheck`
-
-```zig
-pub fn enableUpdateCheck() void
-```
-
-Re-enables the update checker after it has been disabled. The update checker is enabled by default.
 
 ### `getLibraryVersion`
 

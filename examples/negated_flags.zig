@@ -10,7 +10,6 @@ pub fn main(init: std.process.Init) !void {
         .config = .{
             .exit_on_error = false,
             .allow_negated_flags = true,
-            .check_for_updates = false,
             .silent_errors = true,
         },
     });

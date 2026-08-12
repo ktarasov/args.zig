@@ -121,13 +121,9 @@ args.zig/
 │   ├── completion.zig   # Shell completion generation
 │   ├── config.zig       # Configuration management
 │   ├── errors.zig       # Error types and handling
-│   ├── version.zig      # Version information
-│   ├── update_checker.zig # Update checking
-│   └── network.zig      # Network utilities
 ├── examples/
 │   ├── basic.zig        # Basic usage example
-│   ├── advanced.zig     # Advanced features example
-│   └── update_check.zig # Update checker example
+│   └── advanced.zig     # Advanced features example
 ├── bench/
 │   └── benchmark.zig    # Performance benchmarks
 ├── docs/                # VitePress documentation

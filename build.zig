@@ -64,7 +64,6 @@ pub fn build(b: *std.Build) void {
             .{ .name = "config_warnings", .path = "examples/config_warnings.zig" },
             .{ .name = "duration_size", .path = "examples/duration_size.zig" },
             .{ .name = "subcommand_range", .path = "examples/subcommand_range.zig" },
-            .{ .name = "update_check", .path = "examples/update_check.zig", .skip_run_all = true },
             .{ .name = "bracketed_list", .path = "examples/bracketed_list.zig" },
             .{ .name = "format_option", .path = "examples/format_option.zig" },
             .{ .name = "fallback_parse", .path = "examples/fallback_parse.zig" },

@@ -568,8 +568,6 @@ fn benchmarkCaseInsensitiveParsing(allocator: std.mem.Allocator) !void {
     var parser = try args.ArgumentParser.init(allocator, .{
         .name = "bench",
         .config = .{
-            .check_for_updates = false,
-            .show_update_notification = false,
             .use_colors = false,
             .show_defaults = false,
             .show_env_vars = false,
@@ -651,7 +649,7 @@ pub fn main(init: std.process.Init) !void {
     var results: std.ArrayList(BenchmarkResult) = .empty;
     defer results.deinit(allocator);
 
-    // Disable update checking for benchmarks
+    // Disable colors for benchmarks
     args.initConfig(args.Config.minimal());
 
     // Basic Parsing

@@ -9,7 +9,6 @@ pub fn main(init: std.process.Init) !void {
         .description = "Validate IPv4, IPv6, host:port, and retries in one CLI",
         .config = .{
             .exit_on_error = false,
-            .check_for_updates = false,
             .silent_errors = true,
         },
     });

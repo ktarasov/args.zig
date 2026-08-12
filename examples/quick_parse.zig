@@ -14,7 +14,7 @@ pub fn main(init: std.process.Init) !void {
             .{ .name = "verbose", .long = "verbose", .short = 'v', .help = "Verbose mode", .action = .store_true },
         };
 
-        // Uses Config.minimal() internally — no colors, no update check
+        // Uses Config.minimal() internally — no colors, minimal features
         var result = args.quickParse(allocator, &specs, "quick-example", init) catch |err| {
             if (err == args.ParseError.MissingRequired) {
                 std.debug.print("Usage: quick-example --name <NAME> [--verbose]\n", .{});
@@ -34,7 +34,7 @@ pub fn main(init: std.process.Init) !void {
     }
 
     // === createParser: standard parser with full defaults ===
-    // Includes colors, update checking, and all features enabled.
+    // Includes colors and all features enabled.
     {
         var parser = try args.createParser(allocator, "create-example");
         defer parser.deinit();
@@ -50,7 +50,7 @@ pub fn main(init: std.process.Init) !void {
     }
 
     // === createMinimalParser: minimal config ===
-    // No colors, no update checking — ideal for scripts and CI.
+    // No colors, minimal features — ideal for scripts and CI.
     {
         var parser = try args.createMinimalParser(allocator, "minimal-example");
         defer parser.deinit();

@@ -14,7 +14,6 @@ pub fn main(init: std.process.Init) !void {
             .allow_inline_values = true,
             .allow_interspersed = false,
             .parsing_mode = .permissive,
-            .check_for_updates = false,
             .silent_errors = true,
         },
     });

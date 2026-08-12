@@ -90,10 +90,6 @@ pub const HelpText = struct {
     pub const range_label = "range";
 };
 
-pub const UpdateChecker = struct {
-    pub const github_repo = "muhammad-fiaz/args.zig";
-};
-
 pub const ErrorMessages = struct {
     pub const parse_unknown_option = "unknown option";
     pub const parse_missing_required = "missing required argument";
@@ -204,9 +200,6 @@ pub const ConfigWarnings = struct {
     pub const ignore_unknown_exit_on_error =
         "Config: 'exit_on_error = true' is unused when 'parsing_mode = .ignore_unknown' — " ++
         "unknown options are silently dropped.";
-    pub const update_check_silent =
-        "Config: 'check_for_updates = true' with 'silent_errors = true' — " ++
-        "update notifications will be suppressed; consider disabling update checks.";
     pub const no_suggestion_candidates =
         "Config: 'suggest_builtin_commands = false' and 'suggest_subcommands = false' — " ++
         "suggestion engine has no candidates to offer; consider re-enabling at least one.";
@@ -338,12 +331,4 @@ pub const HelpFormat = struct {
     pub const usage_format = "Usage: {s}";
     pub const version_format = "{s} {s}\n";
     pub const group_exclusive_error = "Arguments in group '{s}' are mutually exclusive\n";
-};
-
-/// Update notification banner lines.
-pub const UpdateNotification = struct {
-    pub const top_border = "╭─────────────────────────────────────────────────────────╮\n";
-    pub const message_line = "│  A new version of {s}args.zig{s} is available: {s}{s}{s} → {s}{s}{s}  {s}│{s}\n";
-    pub const command_line = "│  Run: {s}zig fetch --save {s}{s}                   {s}│{s}\n";
-    pub const bottom_border = "╰─────────────────────────────────────────────────────────╯\n";
 };

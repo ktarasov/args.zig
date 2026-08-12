@@ -48,7 +48,6 @@ A production-grade, high-performance command-line argument parsing library for Z
 - For **archive/compression** support, check out **[archive.zig](https://github.com/muhammad-fiaz/archive.zig)**.
 - For **compression file format** support, check out **[zigx](https://github.com/muhammad-fiaz/zigx)**.
 - For **file downloading** support, check out **[downloader.zig](https://github.com/muhammad-fiaz/downloader.zig)**.
-- For **update checker/auto-updater** support, check out **[updater.zig](https://github.com/muhammad-fiaz/updater.zig)**.
 - For **numerical computing** support, check out **[num.zig](https://github.com/muhammad-fiaz/num.zig)**.
 - For **logging** support, check out **[logly.zig](https://github.com/muhammad-fiaz/logly.zig)**.
 - For **data validation and serialization** support, check out **[zigantic](https://github.com/muhammad-fiaz/zigantic)**.
@@ -65,7 +64,6 @@ A production-grade, high-performance command-line argument parsing library for Z
 - [**Subcommands**](https://muhammad-fiaz.github.io/args.zig/guide/subcommands) - Full support for Git-style subcommands
 - [**Declarative Structs**](https://muhammad-fiaz.github.io/args.zig/guide/declarative-structs) - Parse directly into Zig structs with `parseInto`
 - [**Colored Output**](https://muhammad-fiaz.github.io/args.zig/guide/configuration#display-options) - ANSI color support for beautiful terminal output
-- [**Update Checker**](https://muhammad-fiaz.github.io/args.zig/guide/updates) - Automatic non-blocking update notifications (enabled by default)
 - [**Comprehensive Validation**](https://muhammad-fiaz.github.io/args.zig/guide/validation) - Type checking, choices, and custom validators for complex parsing
 - [**Negated Long Flags**](https://muhammad-fiaz.github.io/args.zig/guide/options-flags#negated-long-flags) - Familiar `--no-flag` support for boolean toggles
 - [**Configurable Matching**](https://muhammad-fiaz.github.io/args.zig/guide/configuration#case-insensitive-matching) - Optional case-insensitive matching for long options and choices
@@ -102,16 +100,16 @@ A production-grade, high-performance command-line argument parsing library for Z
 
 Install the stable release matching your Zig version:
 
-**Zig 0.16+ / 0.17+ (v0.0.8) — Latest:**
+**Zig 0.16+ / 0.17+ (v0.0.9) — Latest:**
+
+```bash
+zig fetch --save https://github.com/muhammad-fiaz/args.zig/archive/refs/tags/0.0.9.tar.gz
+```
+
+**Zig 0.16 (v0.0.8) — Previous Stable:**
 
 ```bash
 zig fetch --save https://github.com/muhammad-fiaz/args.zig/archive/refs/tags/0.0.8.tar.gz
-```
-
-**Zig 0.16 (v0.0.7) — Previous Stable:**
-
-```bash
-zig fetch --save https://github.com/muhammad-fiaz/args.zig/archive/refs/tags/0.0.7.tar.gz
 ```
 
 **Zig 0.15 (v0.0.4):**
@@ -693,27 +691,12 @@ try parser.fromEnvOrDefault("api-key", "MYAPP_API_KEY", "no-key-set", .{
 
 ## Configuration
 
-### Update Checker
-
-The update checker is **enabled by default** to keep you informed about new features and fixes. To disable it:
-
-```zig
-// Method 1: Global disable (Recommended)
-args.disableUpdateCheck();
-
-// Method 2: Per-parser configuration
-var parser = try args.ArgumentParser.init(allocator, .{
-    .name = "myapp",
-    .config = .{ .check_for_updates = false },
-});
-```
-
 ### Minimal Configuration
 
 ```zig
 var parser = try args.ArgumentParser.init(allocator, .{
     .name = "myapp",
-    .config = args.Config.minimal(), // No colors, no update check
+    .config = args.Config.minimal(), // No colors, silent
 });
 ```
 
@@ -745,7 +728,6 @@ zig build run-network_endpoints
 zig build run-error_handling
 zig build run-subcommand_suggestions
 zig build run-decryption_options
-zig build run-update_check
 
 # Run benchmarks
 zig build bench
@@ -826,7 +808,6 @@ Full documentation is available at [muhammad-fiaz.github.io/args.zig](https://mu
 - [Getting Started](https://muhammad-fiaz.github.io/args.zig/guide/getting-started)
 - [API Reference](https://muhammad-fiaz.github.io/args.zig/api/parser)
 - [Examples](https://muhammad-fiaz.github.io/args.zig/examples/)
-- [Update Checker](https://muhammad-fiaz.github.io/args.zig/guide/updates)
 
 > [!TIP]
 > To generate docs for a specific older version, clone the repo, checkout the version tag, and run `zig build docs`:

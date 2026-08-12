@@ -56,9 +56,6 @@ features:
   - icon: 🛠️
     title: Modular Architecture
     details: Highly modular codebase with reusable utility components (internal utils.zig) and clear separation of concerns.
-  - icon: 🔄
-    title: Update Checker
-    details: Optional non-blocking update checker that notifies users of new versions (can be disabled for air-gapped environments).
   - icon: 📋
     title: Declarative Structs
     details: Parse arguments directly into Zig structs with parseInto/derive for rapid prototyping and type-safe configuration.
@@ -92,7 +89,6 @@ features:
 - For **archive/compression** support, check out **[archive.zig](https://github.com/muhammad-fiaz/archive.zig)**.
 - For **compression file format** support, check out **[zigx](https://github.com/muhammad-fiaz/zigx)**.
 - For **file downloading** support, check out **[downloader.zig](https://github.com/muhammad-fiaz/downloader.zig)**.
-- For **update checker/auto-updater** support, check out **[updater.zig](https://github.com/muhammad-fiaz/updater.zig)**.
 - For **numerical computing** support, check out **[num.zig](https://github.com/muhammad-fiaz/num.zig)**.
 - For **logging** support, check out **[logly.zig](https://github.com/muhammad-fiaz/logly.zig)**.
 - For **data validation and serialization** support, check out **[zigantic](https://github.com/muhammad-fiaz/zigantic)**.
@@ -129,9 +125,9 @@ pub fn main(init: std.process.Init) !void {
 
 ### Release Installation (Recommended)
 
-Install the latest stable release (v0.0.8):
+Install the latest stable release (v0.0.9):
 
-zig fetch --save https://github.com/muhammad-fiaz/args.zig/archive/refs/tags/0.0.8.tar.gz
+zig fetch --save https://github.com/muhammad-fiaz/args.zig/archive/refs/tags/0.0.9.tar.gz
 
-- **Package Version:** 0.0.8
+- **Package Version:** 0.0.9
 - **Minimum Zig Version:** 0.16.0 (also compatible with Zig 0.17+)

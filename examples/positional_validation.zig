@@ -9,7 +9,6 @@ pub fn main(init: std.process.Init) !void {
         .description = "Demonstrates positional choices and inverse flags",
         .config = .{
             .exit_on_error = false,
-            .check_for_updates = false,
             .silent_errors = true,
         },
     });

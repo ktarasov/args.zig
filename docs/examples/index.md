@@ -644,31 +644,6 @@ myapp completion zsh > ~/.zfunc/_myapp
 myapp completion fish > ~/.config/fish/completions/myapp.fish
 ```
 
-## Disabling Update Checker
-
-For production or CI/CD environments:
-
-```zig
-const std = @import("std");
-const args = @import("args");
-
-pub fn main(init: std.process.Init) !void {
-    const allocator = init.arena.allocator();
-
-    // Method 1: Global disable
-    args.disableUpdateCheck();
-
-    // Method 2: Use minimal config
-    var parser = try args.ArgumentParser.init(allocator, .{
-        .name = "production-app",
-        .config = args.Config.minimal(),
-    });
-    defer parser.deinit();
-
-    // Your argument definitions...
-}
-```
-
 ## Typed Numeric Options Example
 
 Using `addIntOption`, `addFloatOption`, and `addUintOption` helpers:
@@ -1416,9 +1391,6 @@ zig build run-list_option
 # Run validation demo example
 zig build run-validation_demo
 
-# Run update check example
-zig build run-update_check
-
 # Run prefix option example
 zig build run-prefix_option
 
@@ -1713,7 +1685,7 @@ pub fn main(init: std.process.Init) !void {
         std.debug.print("Output: {s}\n", .{res.getString("output") orelse "stdout"});
     }
 
-    // createMinimalParser: no colors, no update check
+    // createMinimalParser: no colors
     {
         var parser = try args.createMinimalParser(allocator, "minimal-example");
         defer parser.deinit();

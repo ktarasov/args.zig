@@ -24,16 +24,16 @@ This guide will help you get started with args.zig in your Zig project.
 
 Install the stable release matching your Zig version:
 
-**Zig 0.16+ / 0.17+ (v0.0.8) — Latest:**
+**Zig 0.16+ / 0.17+ (v0.0.9) — Latest:**
+
+```bash
+zig fetch --save https://github.com/muhammad-fiaz/args.zig/archive/refs/tags/0.0.9.tar.gz
+```
+
+**Zig 0.16 (v0.0.8) — Previous Stable:**
 
 ```bash
 zig fetch --save https://github.com/muhammad-fiaz/args.zig/archive/refs/tags/0.0.8.tar.gz
-```
-
-**Zig 0.16 (v0.0.7) — Previous Stable:**
-
-```bash
-zig fetch --save https://github.com/muhammad-fiaz/args.zig/archive/refs/tags/0.0.7.tar.gz
 ```
 
 **Zig 0.15 (v0.0.4):**
@@ -57,7 +57,7 @@ After running `zig fetch --save`, your `build.zig.zon` will have a dependency en
 ```zon
 .dependencies = .{
     .args = .{
-        .url = "https://github.com/muhammad-fiaz/args.zig/archive/refs/tags/0.0.8.tar.gz",
+        .url = "https://github.com/muhammad-fiaz/args.zig/archive/refs/tags/0.0.9.tar.gz",
         .hash = "...",
     },
 },
@@ -167,7 +167,7 @@ var parser2 = try args.ArgumentParser.init(allocator, .{
     .config = args.Config.ci(),
 });
 
-// Production - minimal overhead, no colors, no update checker
+// Production - minimal overhead, no colors
 var parser3 = try args.ArgumentParser.init(allocator, .{
     .name = "myapp",
     .config = args.Config.production(),
@@ -325,7 +325,6 @@ zig build test
 
 # Run all maintained examples
 zig build run-all-examples
-zig build run-update_check
 
 # Cross-target compile checks
 zig build -Dtarget=x86_64-windows-gnu
@@ -344,23 +343,6 @@ const args = @import("args");
 
 std.debug.print("args.zig version: {s}\n", .{args.VERSION});
 ```
-
-## Enabling Update Checker
-
-By default, args.zig update checker is **disabled**. To enable it:
-
-```zig
-// Method 1: Global enable
-args.enableUpdateCheck();
-
-// Method 2: Per-parser config
-var parser = try args.ArgumentParser.init(allocator, .{
-    .name = "myapp",
-    .config = .{ .check_for_updates = true },
-});
-```
-
-See [Update Checker Configuration](/guide/updates) for more details.
 
 ## Error Handling & Fallbacks
 

@@ -30,7 +30,6 @@ Building a CLI tool should be straightforward. You shouldn't have to fight with 
 - **🌍 Environment Variables**: Seamless fallback to specific environment variables.
 - **✨ Auto-Generated Help**: Beautiful, consistent, and colorized help text.
 - **🛡️ Robust Validation**: Type checking, choices, numeric ranges, and custom validation functions.
-- **🔔 Update Checker**: Optional integration to notify users of new releases.
 
 
 ## Design Philosophy

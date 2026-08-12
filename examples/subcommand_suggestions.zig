@@ -16,7 +16,6 @@ pub fn main(init: std.process.Init) !void {
         .description = "Shows built-in closest-match suggestions for unknown subcommands",
         .config = .{
             .exit_on_error = false,
-            .check_for_updates = false,
             .silent_errors = true,
             .suggest_closest = true,
             .suggestion_max_distance = 3,
