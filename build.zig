@@ -30,8 +30,6 @@ pub fn build(b: *std.Build) void {
     // When consumed as a library dependency these steps are never created.
     // Build them with `zig build example-<name>` or `zig build -Dbuild-examples=true`.
     const build_examples = b.option(bool, "build-examples", "Build example programs") orelse false;
-    
-    const run_all_examples = b.step("run-all-examples", "Run all examples sequentially");
 
     if (build_examples) {
         const examples = [_]struct { name: []const u8, path: []const u8, skip_run_all: bool = false }{
@@ -103,16 +101,7 @@ pub fn build(b: *std.Build) void {
             const example_step = b.step("example-" ++ example.name, "Build " ++ example.name ++ " example");
             example_step.dependOn(&install_exe.step);
 
-            const run_exe = b.addRunArtifact(exe);
-            run_exe.step.dependOn(&install_exe.step);
-            passthruArgs(run_exe, b);
-
-            const run_step = b.step("run-" ++ example.name, "Run " ++ example.name ++ " example");
-            run_step.dependOn(&run_exe.step);
-
-            if (!example.skip_run_all) {
-                run_all_examples.dependOn(&run_exe.step);
-            }
+            b.installArtifact(exe);
         }
     }
 
