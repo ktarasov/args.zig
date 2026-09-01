@@ -58,7 +58,7 @@ pub fn generateHelpWithConfig(allocator: std.mem.Allocator, spec: CommandSpec, u
         for (spec.subcommands) |sub| {
             if (sub.hidden) continue;
             try writer.print("    {s}{s}{s}", .{ option, sub.name, reset });
-            const padding = if (sub.name.len < 20) 20 - sub.name.len else 2;
+            const padding = if (sub.name.len < cfg.help_indent) cfg.help_indent - sub.name.len else 2;
             try writer.splatByteAll(' ', padding);
             if (sub.help) |h| try writer.print("{s}", .{h});
             try writer.writeAll("\n");
