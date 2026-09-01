@@ -50,7 +50,45 @@ pub fn generateHelpWithConfig(allocator: std.mem.Allocator, spec: CommandSpec, u
         }
     }
 
-    if (spec.subcommands.len > 0) try writer.writeAll(cfg.custom_help_strings.command_tag orelse constants.HelpFormat.command_tag);
+    if (spec.subcommands.len > 0) {
+        try writer.writeAll("\n");
+        for (spec.subcommands) |sub| {
+            if (sub.hidden) continue;
+            try writer.print("    {s}{s}{s} {s}{s}{s}", .{ bold, display_name, reset, option, sub.name, reset });
+            if (sub.args.len > 0) {
+                var subcommand_hidden: usize = 0;
+                var subcommand_positional: usize = 0;
+                for (sub.args) |sub_arg| {
+                    if (sub_arg.hidden) {
+                        subcommand_hidden += 1;
+                        continue;
+                    }
+                    if (sub_arg.positional) {
+                        subcommand_positional += 1;
+                    }
+                }
+
+                const uncounted_subcommand_args = sub.args.len - subcommand_hidden - subcommand_positional;
+                if (uncounted_subcommand_args > 0) {
+                    try writer.print("{s}", .{cfg.custom_help_strings.options_tag orelse constants.HelpFormat.options_tag});
+                }
+
+                for (sub.args) |sub_arg| {
+                    if (sub_arg.hidden) continue;
+                    if (sub_arg.positional) {
+                        if (sub_arg.required) {
+                            try writer.print(" <{s}>", .{sub_arg.name});
+                        } else {
+                            try writer.print(" [{s}]", .{sub_arg.name});
+                        }
+                    }
+                }
+                try writer.writeAll("\n");
+            }
+        }
+    }
+
+    // if (spec.subcommands.len > 0) try writer.writeAll(cfg.custom_help_strings.command_tag orelse constants.HelpFormat.command_tag);
     try writer.writeAll("\n\n");
 
     if (spec.subcommands.len > 0) {
