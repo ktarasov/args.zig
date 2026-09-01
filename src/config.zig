@@ -22,6 +22,25 @@ pub const ConfigWarning = struct {
     auto_resolved: bool = false,
 };
 
+pub const LocalizationHelpFormat = struct {
+    // strings for localization
+    usage_label: ?[]const u8 = null,
+    options_label: ?[]const u8 = null,
+    options_tag: ?[]const u8 = null,
+    command_tag: ?[]const u8 = null,
+    commands_label: ?[]const u8 = null,
+    arguments_label: ?[]const u8 = null,
+    default_label: ?[]const u8 = null,
+    required_annotation: ?[]const u8 = null,
+    env_label: ?[]const u8 = null,
+    print_version_label: ?[]const u8 = null,
+    print_help_label: ?[]const u8 = null,
+    author_label: ?[]const u8 = null,
+    deprecated_label: ?[]const u8 = null,
+    choices_format_label: ?[]const u8 = null,
+    negate_label: ?[]const u8 = null,
+};
+
 /// Global configuration for the argument parser.
 pub const Config = struct {
     use_colors: bool = true,
@@ -58,6 +77,9 @@ pub const Config = struct {
     app_description: ?[]const u8 = null,
     app_epilog: ?[]const u8 = null,
     app_author: ?[]const u8 = null,
+
+    // Localization strings for Help
+    custom_help_strings: LocalizationHelpFormat = .{},
 
     // Preset constructors
 

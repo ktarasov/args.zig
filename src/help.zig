@@ -34,10 +34,10 @@ pub fn generateHelpWithConfig(allocator: std.mem.Allocator, spec: CommandSpec, u
         try writer.print("{s}{s}{s}\n\n", .{ bold, desc, reset });
     }
 
-    try writer.print("{s}{s}{s}\n", .{ header, constants.HelpText.usage, reset });
+    try writer.print("{s}{s}{s}\n", .{ header, cfg.custom_help_strings.usage_label orelse constants.HelpText.usage, reset });
     try writer.print("    {s}{s}{s}", .{ bold, display_name, reset });
 
-    if (spec.args.len > 0) try writer.writeAll(constants.HelpFormat.options_tag);
+    if (spec.args.len > 0) try writer.writeAll(cfg.custom_help_strings.options_tag orelse constants.HelpFormat.options_tag);
 
     for (spec.args) |arg| {
         if (arg.positional) {
@@ -50,11 +50,11 @@ pub fn generateHelpWithConfig(allocator: std.mem.Allocator, spec: CommandSpec, u
         }
     }
 
-    if (spec.subcommands.len > 0) try writer.writeAll(constants.HelpFormat.command_tag);
+    if (spec.subcommands.len > 0) try writer.writeAll(cfg.custom_help_strings.command_tag orelse constants.HelpFormat.command_tag);
     try writer.writeAll("\n\n");
 
     if (spec.subcommands.len > 0) {
-        try writer.print("{s}{s}{s}\n", .{ header, constants.HelpText.commands, reset });
+        try writer.print("{s}{s}{s}\n", .{ header, cfg.custom_help_strings.commands_label orelse constants.HelpText.commands, reset });
         for (spec.subcommands) |sub| {
             if (sub.hidden) continue;
             try writer.print("    {s}{s}{s}", .{ option, sub.name, reset });
@@ -75,14 +75,14 @@ pub fn generateHelpWithConfig(allocator: std.mem.Allocator, spec: CommandSpec, u
     }
 
     if (has_positionals) {
-        try writer.print("{s}{s}{s}\n", .{ header, constants.HelpText.arguments, reset });
+        try writer.print("{s}{s}{s}\n", .{ header, cfg.custom_help_strings.arguments_label orelse constants.HelpText.arguments, reset });
         for (spec.args) |arg| {
             if (!arg.positional or arg.hidden) continue;
             try writer.print("    {s}<{s}>{s}", .{ argument, arg.name, reset });
             const padding = if (arg.name.len + 2 < cfg.help_indent) cfg.help_indent - arg.name.len - 2 else 2;
             try writer.splatByteAll(' ', padding);
             if (arg.help) |h| try writer.print("{s}", .{h});
-            if (arg.required) try writer.print(" {s}{s}{s}", .{ dim, constants.HelpFormat.required_annotation, reset });
+            if (arg.required) try writer.print(" {s}{s}{s}", .{ dim, cfg.custom_help_strings.required_annotation orelse constants.HelpFormat.required_annotation, reset });
             try writer.writeAll("\n");
         }
         try writer.writeAll("\n");
@@ -137,7 +137,7 @@ pub fn generateHelpWithConfig(allocator: std.mem.Allocator, spec: CommandSpec, u
     }
 
     if (has_ungrouped or spec.add_help or spec.add_version) {
-        try writer.print("{s}{s}{s}\n", .{ header, constants.HelpText.options, reset });
+        try writer.print("{s}{s}{s}\n", .{ header, cfg.custom_help_strings.options_label orelse constants.HelpText.options, reset });
 
         for (spec.args) |arg| {
             if (arg.positional or arg.hidden) continue;
@@ -149,18 +149,18 @@ pub fn generateHelpWithConfig(allocator: std.mem.Allocator, spec: CommandSpec, u
         if (spec.add_help) {
             try writer.print("    {s}-h{s}, {s}--help{s}", .{ option, reset, option, reset });
             try writer.splatByteAll(' ', cfg.help_indent - 10);
-            try writer.print("{s}\n", .{constants.HelpText.print_help});
+            try writer.print("{s}\n", .{cfg.custom_help_strings.print_help_label orelse constants.HelpText.print_help});
         }
 
         if (spec.add_version and spec.version != null) {
             try writer.print("    {s}-V{s}, {s}--version{s}", .{ option, reset, option, reset });
             try writer.splatByteAll(' ', cfg.help_indent - 13);
-            try writer.print("{s}\n", .{constants.HelpText.print_version});
+            try writer.print("{s}\n", .{cfg.custom_help_strings.print_version_label orelse constants.HelpText.print_version});
         }
     }
 
     if (cfg.app_author) |author| {
-        try writer.print("\n{s}{s}:{s} {s}\n", .{ header, constants.HelpText.author, reset, author });
+        try writer.print("\n{s}{s}:{s} {s}\n", .{ header, cfg.custom_help_strings.author_label orelse constants.HelpText.author, reset, author });
     }
 
     if (spec.epilog) |epilog| try writer.print("\n{s}\n", .{epilog});
@@ -227,7 +227,7 @@ fn printOption(writer: anytype, arg: ArgSpec, cfg: config.Config, theme: utils.C
                 try writer.splatByteAll(' ', cfg.help_indent);
                 current_col = cfg.help_indent;
             }
-            try writer.print(" {s}{s}{s}{s}", .{ dim, constants.HelpFormat.default_label, d, constants.HelpFormat.close_bracket });
+            try writer.print(" {s}{s}{s}{s}", .{ dim, cfg.custom_help_strings.default_label orelse constants.HelpFormat.default_label, d, constants.HelpFormat.close_bracket });
             current_col += meta_len;
         }
     }
@@ -239,7 +239,7 @@ fn printOption(writer: anytype, arg: ArgSpec, cfg: config.Config, theme: utils.C
                 try writer.splatByteAll(' ', cfg.help_indent);
                 current_col = cfg.help_indent;
             }
-            try writer.print(" {s}{s}{s}{s}", .{ dim, constants.HelpFormat.env_label, e, constants.HelpFormat.close_bracket });
+            try writer.print(" {s}{s}{s}{s}", .{ dim, cfg.custom_help_strings.env_label orelse constants.HelpFormat.env_label, e, constants.HelpFormat.close_bracket });
             current_col += meta_len;
         }
     }
@@ -251,7 +251,7 @@ fn printOption(writer: anytype, arg: ArgSpec, cfg: config.Config, theme: utils.C
             try writer.splatByteAll(' ', cfg.help_indent);
             current_col = cfg.help_indent;
         }
-        try writer.print(" {s}{s}{s}{s}{s}", .{ dim, constants.HelpFormat.negate_label, negate, constants.HelpFormat.close_bracket, reset });
+        try writer.print(" {s}{s}{s}{s}{s}", .{ dim, cfg.custom_help_strings.negate_label orelse constants.HelpFormat.negate_label, negate, constants.HelpFormat.close_bracket, reset });
         current_col += meta_len;
     }
     if (arg.deprecated) |dep| {
@@ -260,7 +260,7 @@ fn printOption(writer: anytype, arg: ArgSpec, cfg: config.Config, theme: utils.C
             try writer.writeAll("\n");
             try writer.splatByteAll(' ', cfg.help_indent);
         }
-        try writer.print(" {s}[{s}: {s}]{s}", .{ header, constants.HelpText.deprecated, dep, reset });
+        try writer.print(" {s}[{s}: {s}]{s}", .{ header, cfg.custom_help_strings.deprecated_label orelse constants.HelpText.deprecated, dep, reset });
     }
     try writer.writeAll("\n");
 }
