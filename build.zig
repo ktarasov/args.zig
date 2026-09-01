@@ -30,6 +30,8 @@ pub fn build(b: *std.Build) void {
     // When consumed as a library dependency these steps are never created.
     // Build them with `zig build example-<name>` or `zig build -Dbuild-examples=true`.
     const build_examples = b.option(bool, "build-examples", "Build example programs") orelse false;
+    
+    const run_all_examples = b.step("run-all-examples", "Run all examples sequentially");
 
     if (build_examples) {
         const examples = [_]struct { name: []const u8, path: []const u8, skip_run_all: bool = false }{
@@ -79,8 +81,6 @@ pub fn build(b: *std.Build) void {
             .{ .name = "schema_builder", .path = "examples/schema_builder.zig" },
             .{ .name = "quick_parse", .path = "examples/quick_parse.zig" },
         };
-
-        const run_all_examples = b.step("run-all-examples", "Run all examples sequentially");
 
         inline for (examples) |example| {
             const exe = b.addExecutable(.{
