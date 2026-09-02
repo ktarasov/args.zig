@@ -116,7 +116,7 @@ pub fn generateHelpWithConfig(allocator: std.mem.Allocator, spec: CommandSpec, u
         try writer.print("{s}{s}{s}\n", .{ header, cfg.custom_help_strings.arguments_label orelse constants.HelpText.arguments, reset });
         for (spec.args) |arg| {
             if (!arg.positional or arg.hidden) continue;
-            try writer.print("    {s}<{s}>{s}", .{ argument, arg.name, reset });
+            try writer.print("    <{s}{s}{s}>", .{ argument, arg.name, reset });
             const padding = if (arg.name.len + 2 < cfg.help_indent) cfg.help_indent - arg.name.len - 2 else 2;
             try writer.splatByteAll(' ', padding);
             if (arg.help) |h| try writer.print("{s}", .{h});
