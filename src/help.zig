@@ -77,9 +77,9 @@ pub fn generateHelpWithConfig(allocator: std.mem.Allocator, spec: CommandSpec, u
                     if (sub_arg.hidden) continue;
                     if (sub_arg.positional) {
                         if (sub_arg.required) {
-                            try writer.print(" <{s}>", .{sub_arg.name});
+                            try writer.print(" {s}<{s}>{s}", .{ argument, sub_arg.name, reset });
                         } else {
-                            try writer.print(" [{s}]", .{sub_arg.name});
+                            try writer.print(" {s}[{s}]{s}", .{ argument, sub_arg.name, reset });
                         }
                     }
                 }
